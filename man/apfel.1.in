@@ -135,6 +135,20 @@ MCP server timeout in seconds. Default
 Use permissive content guardrails for the session. The default
 guardrail profile enforces Apple's standard safety policies.
 .TP
+.B \-\-pcc
+Route the request to Apple Private Cloud Compute instead of the
+on-device model. Requires macOS 27 or later. Still no API keys
+and no account setup: PCC is reached through the same
+.B FoundationModels
+framework as on-device. Provides a 32K token context window.
+On the OpenAI-compatible server, the same routing is selected
+per request by setting
+.B model
+to
+.B apple-foundationmodel-pcc
+(aliases:
+.BR pcc ", " apfel-pcc ).
+.TP
 .BR \-\-retry " [" \fIn\fR ]
 Enable retry with exponential backoff on transient errors. Defaults
 to

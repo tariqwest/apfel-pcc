@@ -78,6 +78,12 @@ public struct CLIArguments: Sendable, Equatable {
     public var maxTokens: Int? = nil
     public var permissive: Bool = false
 
+    // MARK: - Backend
+
+    /// Which Apple Foundation Models backend to use. Defaults to on-device;
+    /// `--pcc` opts into Apple Private Cloud Compute (requires macOS 27+).
+    public var backend: ModelBackend = .onDevice
+
     // MARK: - Retry
 
     public var retryEnabled: Bool = false
@@ -397,6 +403,9 @@ extension CLIArguments {
 
             case "--permissive":
                 result.permissive = true
+
+            case "--pcc":
+                result.backend = .privateCloudCompute
 
             // -- Retry --
 

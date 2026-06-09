@@ -548,6 +548,26 @@ func runCLIArgumentsTests() {
     }
 
     // ========================================================================
+    // MARK: - Backend flags
+    // ========================================================================
+
+    test("default backend is on-device") {
+        let args = try CLIArguments.parse(["hi"])
+        try assertEqual(args.backend, .onDevice)
+    }
+
+    test("--pcc selects Private Cloud Compute") {
+        let args = try CLIArguments.parse(["--pcc", "hi"])
+        try assertEqual(args.backend, .privateCloudCompute)
+    }
+
+    test("--pcc works without a prompt (e.g. --chat --pcc)") {
+        let args = try CLIArguments.parse(["--chat", "--pcc"])
+        try assertEqual(args.backend, .privateCloudCompute)
+        try assertEqual(args.mode, .chat)
+    }
+
+    // ========================================================================
     // MARK: - Retry flags
     // ========================================================================
 

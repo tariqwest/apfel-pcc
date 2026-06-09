@@ -55,8 +55,6 @@ enum ContextManager {
             finalPrompt = text
             history = Array(conversation.dropLast())
         }
-        let model = makeModel(permissive: options.permissive)
-
         // Convert tools: native ToolDefinitions + text fallback for failures
         var nativeToolDefs: [Transcript.ToolDefinition] = []
         var fallbackTools: [ToolDef] = []
@@ -100,7 +98,11 @@ enum ContextManager {
             throw ApfelError.contextOverflow
         }
 
-        let session = makeTranscriptSession(model: model, entries: entries)
+        let session = makeBackendSession(
+            backend: options.backend,
+            permissive: options.permissive,
+            entries: entries
+        )
         // Return the entries we actually built (with native tool definitions
         // intact) so callers can count prompt tokens accurately. Reading them
         // back from `session.transcript` drops `Instructions.toolDefinitions`,

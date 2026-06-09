@@ -107,6 +107,13 @@ func handleChatCompletion(_ request: Request, context: some RequestContext) asyn
         outputReserve: chatRequest.x_context_output_reserve ?? BodyLimits.defaultOutputReserveTokens
     )
 
+    // Per-request backend routing: clients opt into PCC by setting
+    // `model: "apple-foundationmodel-pcc"` (or the `pcc` / `apfel-pcc`
+    // aliases). Anything else stays on-device. Unknown ids fall through to
+    // the on-device default so OpenAI clients that hard-code e.g. `gpt-4`
+    // keep working.
+    let backend = ModelBackend.from(modelName: chatRequest.model)
+
     // Build session options from request (retry config comes from server config)
     let sessionOpts = SessionOptions(
         temperature: chatRequest.temperature,
@@ -116,7 +123,8 @@ func handleChatCompletion(_ request: Request, context: some RequestContext) asyn
         permissive: serverState.config.permissive,
         contextConfig: contextConfig,
         retryEnabled: serverState.config.retryEnabled,
-        retryCount: serverState.config.retryCount
+        retryCount: serverState.config.retryCount,
+        backend: backend
     )
 
     // Inject MCP tools if client didn't send any; track source for auto-execution

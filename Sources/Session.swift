@@ -20,11 +20,35 @@ struct SessionOptions: Sendable {
     let contextConfig: ContextConfig
     let retryEnabled: Bool
     let retryCount: Int
+    let backend: ModelBackend
 
     static let defaults = SessionOptions(
         temperature: nil, topP: nil, maxTokens: nil, seed: nil, permissive: false,
-        contextConfig: .defaults, retryEnabled: false, retryCount: 3
+        contextConfig: .defaults, retryEnabled: false, retryCount: 3,
+        backend: .default
     )
+
+    init(
+        temperature: Double?,
+        topP: Double?,
+        maxTokens: Int?,
+        seed: UInt64?,
+        permissive: Bool,
+        contextConfig: ContextConfig,
+        retryEnabled: Bool,
+        retryCount: Int,
+        backend: ModelBackend = .default
+    ) {
+        self.temperature = temperature
+        self.topP = topP
+        self.maxTokens = maxTokens
+        self.seed = seed
+        self.permissive = permissive
+        self.contextConfig = contextConfig
+        self.retryEnabled = retryEnabled
+        self.retryCount = retryCount
+        self.backend = backend
+    }
 }
 
 // MARK: - Generation Options
@@ -58,10 +82,46 @@ func makeGenerationOptions(_ opts: SessionOptions) -> GenerationOptions {
 
 // MARK: - Model Selection
 
+/// Backwards-compatible: returns the on-device `SystemLanguageModel`.
+/// Callers that need PCC routing should go through `makeSession` /
+/// `makeTranscriptSession` with `SessionOptions.backend` set.
 func makeModel(permissive: Bool) -> SystemLanguageModel {
     SystemLanguageModel(
         guardrails: permissive ? .permissiveContentTransformations : .default
     )
+}
+
+/// Build a `LanguageModelSession` from `entries`, dispatching on `backend`.
+/// PCC requires macOS 27.0+; on older systems the call falls back to the
+/// on-device `SystemLanguageModel` (the caller is responsible for surfacing
+/// that, e.g. via `ApfelError.modelUnavailable`).
+func makeBackendSession(
+    backend: ModelBackend,
+    permissive: Bool,
+    entries: [Transcript.Entry]
+) -> LanguageModelSession {
+    switch backend {
+    case .onDevice:
+        return makeTranscriptSession(
+            model: makeModel(permissive: permissive),
+            entries: entries
+        )
+    case .privateCloudCompute:
+        if #available(macOS 27.0, *) {
+            let pcc = PrivateCloudComputeLanguageModel()
+            if entries.isEmpty {
+                return LanguageModelSession(model: pcc)
+            }
+            return LanguageModelSession(model: pcc, transcript: Transcript(entries: entries))
+        }
+        // PCC is unavailable on older systems. Fall back to on-device so the
+        // request can still complete; CLI / handlers surface a clear message
+        // before reaching this path on a real macOS 26 host.
+        return makeTranscriptSession(
+            model: makeModel(permissive: permissive),
+            entries: entries
+        )
+    }
 }
 
 // MARK: - Simple Session (CLI use)
@@ -69,13 +129,19 @@ func makeModel(permissive: Bool) -> SystemLanguageModel {
 /// Create a LanguageModelSession with optional system instructions for CLI use.
 /// Uses Transcript.Instructions so streaming and non-streaming read the same source.
 func makeSession(systemPrompt: String?, options: SessionOptions = .defaults) -> LanguageModelSession {
-    let model = makeModel(permissive: options.permissive)
-    guard let systemPrompt, !systemPrompt.isEmpty else {
-        return LanguageModelSession(model: model)
+    let entries: [Transcript.Entry]
+    if let systemPrompt, !systemPrompt.isEmpty {
+        let segment = Transcript.TextSegment(content: systemPrompt)
+        let instructions = Transcript.Instructions(segments: [.text(segment)], toolDefinitions: [])
+        entries = [.instructions(instructions)]
+    } else {
+        entries = []
     }
-    let segment = Transcript.TextSegment(content: systemPrompt)
-    let instructions = Transcript.Instructions(segments: [.text(segment)], toolDefinitions: [])
-    return makeTranscriptSession(model: model, entries: [.instructions(instructions)])
+    return makeBackendSession(
+        backend: options.backend,
+        permissive: options.permissive,
+        entries: entries
+    )
 }
 
 func makePromptEntry(_ prompt: String, options: SessionOptions = .defaults) -> Transcript.Entry {

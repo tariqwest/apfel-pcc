@@ -100,16 +100,33 @@ func startServer(config: ServerConfig, mcpManager: MCPManager? = nil) async thro
     // Models — includes context_window and supported_languages from SDK.
     // Uses the same startup-cached values as /health.
     router.get("/v1/models") { _, _ -> Response in
-        return jsonResponse(jsonString(ModelsListResponse(
-            object: "list",
-            data: [.init(
-                id: modelName, object: "model", created: 1719792000, owned_by: "apple",
+        let sharedParams = ["temperature", "max_tokens", "seed", "stream", "tools", "tool_choice", "response_format", "x_context_strategy", "x_context_max_turns", "x_context_output_reserve"]
+        let unsupportedParams = ["logprobs", "n", "stop", "presence_penalty", "frequency_penalty"]
+        // PCC context window is 32K (constant per Apple's WWDC26 announcement);
+        // the per-instance value isn't read here to avoid a startup call into a
+        // backend the user may never use.
+        let pccContextWindow = 32_768
+        var entries: [ModelsListResponse.ModelObject] = [
+            .init(
+                id: ModelBackend.onDevice.canonicalModelID,
+                object: "model", created: 1719792000, owned_by: "apple",
                 context_window: cachedContextSize,
-                supported_parameters: ["temperature", "max_tokens", "seed", "stream", "tools", "tool_choice", "response_format", "x_context_strategy", "x_context_max_turns", "x_context_output_reserve"],
-                unsupported_parameters: ["logprobs", "n", "stop", "presence_penalty", "frequency_penalty"],
+                supported_parameters: sharedParams,
+                unsupported_parameters: unsupportedParams,
                 notes: "Apple on-device model via FoundationModels framework. Unsupported parameters are rejected with 400 when present (except n=1 and logprobs=false). Supported languages: \(cachedLangs.joined(separator: ", "))"
-            )]
-        )))
+            )
+        ]
+        if #available(macOS 27.0, *) {
+            entries.append(.init(
+                id: ModelBackend.privateCloudCompute.canonicalModelID,
+                object: "model", created: 1749340800, owned_by: "apple",
+                context_window: pccContextWindow,
+                supported_parameters: sharedParams,
+                unsupported_parameters: unsupportedParams,
+                notes: "Apple Private Cloud Compute via FoundationModels framework (macOS 27+). 32K context, no API keys, no account setup. Opt in per request with `model: \"\(ModelBackend.privateCloudCompute.canonicalModelID)\"` (aliases: pcc, apfel-pcc)."
+            ))
+        }
+        return jsonResponse(jsonString(ModelsListResponse(object: "list", data: entries)))
     }
 
     // Chat completions (with logging, retry, concurrency)

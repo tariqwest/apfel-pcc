@@ -160,7 +160,8 @@ let sessionOpts = SessionOptions(
     permissive: parsed.permissive,
     contextConfig: contextConfig,
     retryEnabled: parsed.retryEnabled,
-    retryCount: parsed.retryCount
+    retryCount: parsed.retryCount,
+    backend: parsed.backend
 )
 
 // Resolve the final allowed-origins list: defaults + any CLI-specified values.
@@ -175,18 +176,26 @@ let serverAllowedOrigins: [String] = {
 // Check model availability for modes that need it. If unavailable, surface
 // the specific reason (appleIntelligenceNotEnabled / deviceNotEligible /
 // modelNotReady) so users know exactly what to fix. See #59.
+//
+// The pre-flight only covers the on-device backend. PCC has its own
+// availability surface (`PrivateCloudComputeLanguageModel.availability`)
+// which the FoundationModels framework checks at the request site - we let
+// errors there surface through ApfelError.classify rather than re-implementing
+// the check.
 switch parsed.mode {
 case .modelInfo, .serve, .update:
     break
 default:
-    let availability = await TokenCounter.shared.availability
-    if !availability.isAvailable {
-        printError("Model unavailable: \(availability.shortLabel)")
-        printStderr("")
-        printStderr(availability.remediation)
-        printStderr("")
-        printStderr("For full diagnostic info run: apfel --model-info")
-        exit(exitModelUnavailable)
+    if parsed.backend == .onDevice {
+        let availability = await TokenCounter.shared.availability
+        if !availability.isAvailable {
+            printError("Model unavailable: \(availability.shortLabel)")
+            printStderr("")
+            printStderr(availability.remediation)
+            printStderr("")
+            printStderr("For full diagnostic info run: apfel --model-info")
+            exit(exitModelUnavailable)
+        }
     }
 }
 

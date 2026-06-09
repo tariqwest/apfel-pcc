@@ -91,7 +91,6 @@ func chat(systemPrompt: String?, options: SessionOptions = .defaults, mcpManager
     let mcpTools = await mcpManager?.allTools() ?? []
     let hasMCPTools = !mcpTools.isEmpty
 
-    let model = makeModel(permissive: options.permissive)
     var session: LanguageModelSession
     if hasMCPTools {
         // Build session with ALL tool schemas as text instructions and NO native
@@ -109,8 +108,12 @@ func chat(systemPrompt: String?, options: SessionOptions = .defaults, mcpManager
         let instrText = instrParts.joined(separator: "\n\n")
         let segments: [Transcript.Segment] = [.text(Transcript.TextSegment(content: instrText))]
         let instr = Transcript.Instructions(segments: segments, toolDefinitions: [])
-        session = makeTranscriptSession(model: model, entries: [.instructions(instr)])
-        debugLog("chat", "session created with \(mcpTools.count) text-injected tools")
+        session = makeBackendSession(
+            backend: options.backend,
+            permissive: options.permissive,
+            entries: [.instructions(instr)]
+        )
+        debugLog("chat", "session created with \(mcpTools.count) text-injected tools backend=\(options.backend)")
     } else {
         session = makeSession(systemPrompt: systemPrompt, options: options)
     }

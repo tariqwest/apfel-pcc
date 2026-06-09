@@ -390,6 +390,22 @@ func runApfelCorePublicAPIUsageTests() {
         try assertTrue(ModelAvailability.available.isAvailable)
     }
 
+    // MARK: - ModelBackend
+
+    test("ModelBackend public surface compiles") {
+        let cases: [ModelBackend] = [.onDevice, .privateCloudCompute]
+        for b in cases {
+            let _: String = b.canonicalModelID
+            let _: String = b.displayLabel
+            let _: String = b.description
+            let _: String = b.rawValue
+            let _ = requireSendable(b)
+        }
+        let _: Set<ModelBackend> = [.onDevice, .privateCloudCompute]
+        try assertEqual(ModelBackend.default, .onDevice)
+        try assertEqual(ModelBackend.from(modelName: "pcc"), .privateCloudCompute)
+    }
+
     // MARK: - OriginValidator
 
     test("OriginValidator public surface compiles") {

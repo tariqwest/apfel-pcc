@@ -1,6 +1,6 @@
 # apfel - Project Instructions
 
-**The free AI already on your Mac.** This is our claim. Every surface (README, landing page, repo description) must reinforce it.
+**The free AI already on your Mac.** This is our claim. Every surface (README, landing page, repo description) must reinforce it. On-device is the default; Apple's Private Cloud Compute (still no API keys, still no third parties) is an explicit opt-in.
 
 ## The Golden Goal
 
@@ -54,8 +54,8 @@ The README.md mirrors this priority - **violating this structure is a bug.**
 
 ### Non-negotiable principles:
 
-- **100% on-device.** No cloud, no API keys, no network for inference. Ever.
-- **Honest about limitations.** 4096 token context, no embeddings, no vision - say so clearly.
+- **On-device by default; opt-in Apple Private Cloud Compute.** The default path is 100% on-device with no cloud, no API keys, and no network for inference - that stays the headline. Callers can explicitly opt into Apple's Private Cloud Compute backend (no API keys, no account setup, fully private per Apple's PCC contract) via `--pcc` on the CLI or `model: "apple-foundationmodel-pcc"` on `/v1/chat/completions`. No other cloud providers, ever - PCC routes through the same `FoundationModels` framework as on-device, so the trust model is Apple's, not a third party's.
+- **Honest about limitations.** On-device: 4096 token context, no embeddings, no vision - say so clearly. PCC: 32K context, requires macOS 27+.
 - **Clean code, clean logic.** No hacks. Proper error types. Real token counts.
 - **Swift 6 strict concurrency.** No data races.
 - **Usable security.** Secure defaults that don't get in the way.
