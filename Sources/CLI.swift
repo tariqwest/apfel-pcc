@@ -193,7 +193,11 @@ func chat(systemPrompt: String?, options: SessionOptions = .defaults, mcpManager
                     let truncated = try await truncateTranscript(transcript, budget: budget, config: options.contextConfig)
                     // Tool schemas live in the Instructions text segments (not native
                     // toolDefinitions), so they survive truncation without re-injection.
-                    session = LanguageModelSession(model: model, transcript: truncated)
+                    session = makeBackendSession(
+                        backend: options.backend,
+                        permissive: options.permissive,
+                        entries: transcriptEntries(truncated)
+                    )
                     debugLog("context", "rotated\(hasMCPTools ? " (tool text preserved)" : "")")
                     if !quietMode && outputFormat == .plain {
                         print(styled("  [context rotated — \(options.contextConfig.strategy.rawValue)]", .dim))
@@ -451,6 +455,7 @@ func printUsage() {
           --mcp-token <token>    Bearer token for remote MCP servers (prefer APFEL_MCP_TOKEN env)
           --mcp-timeout <n>      MCP server timeout in seconds [default: 5]
           --permissive           Use permissive content guardrails
+          --pcc                  Use Apple Private Cloud Compute (macOS 27+, 32K context, no API keys)
           --retry [n]            Enable retry with exponential backoff [default: 3 retries]
           --model-info           Print model capabilities and exit
           --benchmark            Run internal performance benchmarks
