@@ -48,6 +48,30 @@ func runToolCallHandlerTests() {
         try assertNotNil(result)
         try assertEqual(result!.first?.argumentsString, "{\"key\":\"val\"}")
     }
+    test("parses function name string shape with sibling arguments") {
+        let response = #"{"tool_calls": [{"id": "call_unique1", "type": "function", "function": "get_current_conditions", "arguments": "{\"latitude\": 37.7749, \"longitude\": -122.4194}"}]}"#
+        let result = ToolCallHandler.detectToolCall(in: response)
+        try assertNotNil(result)
+        try assertEqual(result!.first?.name, "get_current_conditions")
+        try assertEqual(result!.first?.argumentsString, "{\"latitude\": 37.7749, \"longitude\": -122.4194}")
+    }
+    test("function name string shape without arguments defaults to empty object") {
+        let response = #"{"tool_calls": [{"id": "c1", "type": "function", "function": "get_time"}]}"#
+        let result = ToolCallHandler.detectToolCall(in: response)
+        try assertNotNil(result)
+        try assertEqual(result!.first?.name, "get_time")
+        try assertEqual(result!.first?.argumentsString, "{}")
+    }
+    test("function name string shape with object sibling arguments serializes them") {
+        let response = #"{"tool_calls": [{"id": "c1", "type": "function", "function": "add", "arguments": {"a": 1}}]}"#
+        let result = ToolCallHandler.detectToolCall(in: response)
+        try assertNotNil(result)
+        try assertEqual(result!.first?.argumentsString, "{\"a\":1}")
+    }
+    test("function that is neither dict nor string skips the call") {
+        let response = #"{"tool_calls": [{"id": "c1", "type": "function", "function": 42}]}"#
+        try assertNil(ToolCallHandler.detectToolCall(in: response))
+    }
     test("detects multiple tool calls") {
         let response = #"{"tool_calls": [{"id": "c1", "type": "function", "function": {"name": "fn1", "arguments": "{}"}}, {"id": "c2", "type": "function", "function": {"name": "fn2", "arguments": "{}"}}]}"#
         let result = ToolCallHandler.detectToolCall(in: response)

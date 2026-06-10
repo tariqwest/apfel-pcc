@@ -7,6 +7,11 @@ apfel-plus \- Apple Intelligence from the command line
 .RI [ prompt ]
 .br
 .B apfel-plus
+.RI [ options ]
+.B \-\-
+.I prompt
+.br
+.B apfel-plus
 .B \-f
 .I file
 .RI [ options ]
@@ -64,6 +69,11 @@ or rejected with exit code 4 if the
 .B strict
 strategy is selected.
 .SH OPTIONS
+.TP
+.B \-\-
+End of options. Everything after
+.B \-\-
+is taken as the prompt verbatim, even if it starts with a dash.
 .TP
 .BR \-f ", " \-\-file " " \fIpath\fR
 Attach file content to the prompt. Repeatable; accepts multiple

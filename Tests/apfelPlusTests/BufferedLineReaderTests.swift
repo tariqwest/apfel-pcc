@@ -175,6 +175,35 @@ func runBufferedLineReaderTests() {
         try assertTrue(didThrow, "Expected empty response error")
     }
 
+    test("blank line in leftover fails fast with empty-response, not a timeout stall") {
+        let (readFD, writeFD) = makePipe()
+        defer { close(readFD); close(writeFD) }
+
+        // One write: "a\n\nb\n". The first read returns "a" and stashes "\nb\n"
+        // as leftover. The blank line crossing the leftover path must behave
+        // exactly like a fresh blank line (throw "Empty response") instead of
+        // silently falling through to poll() and blocking until timeout while
+        // "b\n" is already buffered.
+        writeString(writeFD, "a\n\nb\n")
+
+        let reader = BufferedLineReader(fileDescriptor: readFD)
+        let first = try reader.readLine(timeoutMilliseconds: 1000, operationDescription: "test")
+        try assertEqual(first, "a")
+
+        var didThrow = false
+        do {
+            let _ = try reader.readLine(timeoutMilliseconds: 200, operationDescription: "test")
+        } catch {
+            didThrow = true
+            try assertTrue("\(error)".contains("Empty response"), "Expected empty response error, got: \(error)")
+        }
+        try assertTrue(didThrow, "Expected empty response error for blank leftover line")
+
+        // The line after the blank one is still intact in the leftover buffer.
+        let third = try reader.readLine(timeoutMilliseconds: 1000, operationDescription: "test")
+        try assertEqual(third, "b")
+    }
+
     // -- Multi-message sequences (simulating MCP handshake) --
 
     test("handles init + tools/list sequence like real MCP handshake") {

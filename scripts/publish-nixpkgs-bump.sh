@@ -70,6 +70,19 @@ if ! gh api user >/dev/null 2>&1; then
   exit 0
 fi
 
+# --- Maintainer-era short-circuit ---
+# Once arthurficial is listed as apfel-llm maintainer in nixpkgs master, the
+# canonical zero-touch flow takes over: r-ryantm opens the bump PR and
+# scripts/nixpkgs-automerge.sh posts the merge-bot command after verifying
+# version + hash. Opening our own PR would only BLOCK r-ryantm (nixpkgs-update
+# skips packages with an open bump PR), and the merge bot cannot merge
+# non-r-ryantm PRs without a committer approval. See docs/nixpkgs.md.
+master_pkg=$(curl -fsSL "https://raw.githubusercontent.com/$UPSTREAM/master/$PACKAGE_PATH" 2>/dev/null || true)
+if grep -q "arthurficial" <<<"$master_pkg"; then
+  info "apfel-llm has arthurficial as maintainer - deferring to r-ryantm + merge bot"
+  exec "$REPO_ROOT/scripts/nixpkgs-automerge.sh" --version "$version" $($dry_run && echo --dry-run)
+fi
+
 # --- Ensure fork exists ---
 info "Ensuring fork $FORK exists..."
 if ! gh repo view "$FORK" >/dev/null 2>&1; then

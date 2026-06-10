@@ -434,6 +434,7 @@ func printUsage() {
 
     \(styled("USAGE:", .yellow, .bold))
       \(appName) [OPTIONS] <prompt>       Send a single prompt
+      \(appName) [OPTIONS] -- <prompt>    "--" ends options; prompt may start with "-"
       \(appName) -f <file> <prompt>       Attach file content to prompt
       \(appName) --chat                   Interactive conversation
       \(appName) --stream <prompt>        Stream a single response

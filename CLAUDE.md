@@ -84,8 +84,8 @@ HTTP Server (/v1/*) ───────┘   ContextManager → Transcript API
 
 ## Current Status
 
-- Version: `1.5.0` (source of truth: `.version`)
-- Tests: 650 unit + 273 integration
+- Version: `1.5.5` (source of truth: `.version`)
+- Tests: 661 unit + 274 integration
 - Distribution: homebrew-core (`brew install apfel-plus`), nixpkgs (`nix profile install nixpkgs#apfel-plus-llm`), and the tariqwest/homebrew-tap
 - Stability policy: [STABILITY.md](STABILITY.md)
 - Security policy: [SECURITY.md](SECURITY.md)
@@ -98,11 +98,11 @@ make install                   # build release + install to /usr/local/bin (NO v
 make build                     # build release only (NO version bump)
 make version                   # print current version
 swift build                    # debug build
-swift run apfel-plus-tests          # unit tests only (599 tests)
+swift run apfel-plus-tests     # unit tests only (661 tests)
 make preflight                 # full release qualification (unit + integration + policy checks)
 ```
 
-`make test` builds the release binary, runs all 599 unit tests, starts test servers, runs all 257 integration tests, and cleans up. This is the single command for development.
+`make test` builds the release binary, runs all 661 unit tests, starts test servers, runs all 274 integration tests, and cleans up. This is the single command for development.
 
 `make install` auto-unlinks Homebrew apfel-plus so the dev binary takes PATH priority. `make uninstall` restores the Homebrew link.
 
@@ -131,7 +131,7 @@ bash scripts/generate-examples.sh          # ~2 minutes, overwrites docs/EXAMPLE
 | Security | `Sources/Core/OriginValidator.swift`, `Sources/SecurityMiddleware.swift` |
 | MCP client | `Sources/Core/MCPProtocol.swift`, `Sources/MCPClient.swift` |
 | MCP calculator | `mcp/calculator/server.py` |
-| Tests | `Tests/apfelPlusTests/` (599 unit), `Tests/integration/` (257 integration) |
+| Tests | `Tests/apfelPlusTests/` (661 unit), `Tests/integration/` (274 integration) |
 
 | Docs | `docs/` (brew-install, EXAMPLES, release, tool-calling-guide) |
 | Scripts | `scripts/generate-examples.sh`, `scripts/write-homebrew-formula.sh`, `scripts/release-preflight.sh`, `scripts/post-release-verify.sh` |
@@ -329,7 +329,7 @@ apfel-plus ships through three channels. All pull the same signed tarball from e
 
 - **homebrew-core** - `brew install apfel-plus`. Autobump detects new releases; latency ~24h. We do not maintain the formula.
 - **tariqwest/homebrew-tap** - `brew install tariqwest/tap/apfel-plus`. Synchronous, pushed as part of `make release`. Secondary channel; also houses apfel-plus-family tools (apfel-chat, apfel-clip, apfel-plus-mcp, etc.).
-- **nixpkgs** - `nix profile install nixpkgs#apfel-plus-llm`. Name is `apfel-plus-llm` because nixpkgs already has an unrelated physics `apfel-plus` package and the disambiguator landed upstream as `apfel-plus-llm` (PR NixOS/nixpkgs#508084). Bumps fire automatically as the final non-fatal step of `make release` via `scripts/publish-nixpkgs-bump.sh` (forks `NixOS/nixpkgs` once, syncs from upstream, opens a PR via the local `gh` session - no stored PAT). The `r-ryantm` bot is the safety net if the local bump is skipped. See [docs/nixpkgs.md](docs/nixpkgs.md).
+- **nixpkgs** - `nix profile install nixpkgs#apfel-plus-llm`. Name is `apfel-plus-llm` because nixpkgs already has an unrelated physics `apfel-plus` package and the disambiguator landed upstream as `apfel-plus-llm` (PR NixOS/nixpkgs#508084). Bumps fire automatically as the final non-fatal step of `make release` via `scripts/publish-nixpkgs-bump.sh`. Once tariqwest is listed as package maintainer it defers to the zero-touch flow: r-ryantm opens the bump PR and `scripts/nixpkgs-automerge.sh` (run by `make release` + a twice-daily launchd agent) verifies version/hash and triggers the nixpkgs merge bot. See [docs/nixpkgs.md](docs/nixpkgs.md).
 - Emergency Homebrew bump: `brew bump-formula-pr apfel-plus --url=<tarball-url> --sha256=<hash>`
 - Standalone nixpkgs bump (e.g. catch-up if a release skipped it): `./scripts/publish-nixpkgs-bump.sh --version X.Y.Z`. Manual recovery in [docs/nixpkgs.md](docs/nixpkgs.md) "Manual self-bump".
 
@@ -375,7 +375,7 @@ apfel-plus ships through three channels. All pull the same signed tarball from e
 
 **What runs the full suite (local, before every release):**
 - `make preflight` or `make release` on a Mac with Apple Intelligence
-- 599 unit + 257 integration = 856 tests, 0 skipped
+- 661 unit + 274 integration = 935 tests, 0 skipped
 - Release scripts use directory discovery (`Tests/integration/`), not explicit file lists
 - This is the REAL qualification gate. GitHub CI is a safety net, not the source of truth.
 

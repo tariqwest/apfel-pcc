@@ -48,9 +48,14 @@ public final class BufferedLineReader: Sendable {
             if let newlineIndex = state.leftover.firstIndex(of: UInt8(ascii: "\n")) {
                 lineBuffer.append(state.leftover[state.leftover.startIndex..<newlineIndex])
                 state.leftover = Data(state.leftover[(newlineIndex + 1)...])
-                if let line = String(data: lineBuffer, encoding: .utf8), !line.isEmpty {
-                    return line
+                // A blank (or undecodable) line crossing the leftover path must
+                // fail the same way a freshly-read blank line does (see the guard
+                // below). Falling through to poll() instead would block on I/O
+                // until timeout even though the next line may already be buffered.
+                guard let line = String(data: lineBuffer, encoding: .utf8), !line.isEmpty else {
+                    throw MCPError.processError("Empty response from MCP server")
                 }
+                return line
             } else if !state.leftover.isEmpty {
                 lineBuffer.append(state.leftover)
                 state.leftover = Data()

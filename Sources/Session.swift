@@ -255,10 +255,15 @@ func trimHistoryEntriesToBudget(
             base: baseEntries, history: historyEntries, final: finalEntry, budget: budget,
             permissive: config.permissive)
     case .strict:
-        // No trimming — return all history or nil if it exceeds budget
+        // No trimming — return all history or nil if it exceeds budget.
+        // The final entry is included for the budget CHECK only; like every
+        // other strategy the returned entries must NOT contain it, because
+        // callers send the final prompt separately via respond(). Including
+        // it here made the model see the prompt twice and double-counted it
+        // in prompt_tokens.
         let all = assembleTranscriptEntries(base: baseEntries, history: historyEntries, final: finalEntry)
         return await fitsTranscriptBudget(all, budget: budget)
-            ? all
+            ? assembleTranscriptEntries(base: baseEntries, history: historyEntries)
             : nil
     }
 }

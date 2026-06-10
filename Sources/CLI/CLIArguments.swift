@@ -463,6 +463,19 @@ extension CLIArguments {
                     throw CLIParseError(fileErrorMessage(path: path))
                 }
 
+            // -- End of options (UNIX convention) --
+
+            case "--":
+                // Everything after "--" is the prompt verbatim, even if it
+                // starts with a dash. A bare trailing "--" leaves the prompt
+                // empty so stdin handling is unchanged.
+                let rest = args[(i + 1)...]
+                if !rest.isEmpty {
+                    result.prompt = rest.joined(separator: " ")
+                }
+                i = args.count
+                continue
+
             // -- Fallthrough: prompt or unknown flag --
 
             default:

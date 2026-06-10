@@ -125,6 +125,28 @@ func runCLIArgumentsTests() {
         try assertEqual(args.prompt, "hello")
     }
 
+    test("-- ends option parsing: dash-prefixed prompt passes through") {
+        let args = try CLIArguments.parse(["--", "-hello"])
+        try assertEqual(args.prompt, "-hello")
+    }
+
+    test("-- ends option parsing: flag-looking words become the prompt") {
+        let args = try CLIArguments.parse(["--", "--verbose", "mode", "explained"])
+        try assertEqual(args.prompt, "--verbose mode explained")
+    }
+
+    test("flags before -- still take effect") {
+        let args = try CLIArguments.parse(["--quiet", "--", "--stream"])
+        try assertTrue(args.quiet)
+        try assertEqual(args.prompt, "--stream")
+        try assertEqual(args.mode, .single)
+    }
+
+    test("bare -- with nothing after leaves prompt empty (stdin path)") {
+        let args = try CLIArguments.parse(["--"])
+        try assertEqual(args.prompt, "")
+    }
+
     // ========================================================================
     // MARK: - System prompt
     // ========================================================================
