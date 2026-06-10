@@ -1,9 +1,9 @@
 """
-apfel Integration Tests — OpenAI Python Client E2E
+apfel-plus Integration Tests — OpenAI Python Client E2E
 
-Validates that apfel's OpenAI-compatible server works with the real `openai` library.
+Validates that apfel-plus's OpenAI-compatible server works with the real `openai` library.
 Requires: pip install openai pytest httpx
-Requires: apfel --serve running on localhost:11434
+Requires: apfel-plus --serve running on localhost:11434
 
 Run: python3 -m pytest Tests/integration/openai_client_test.py -v
 """

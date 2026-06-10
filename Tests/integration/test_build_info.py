@@ -1,5 +1,5 @@
 """
-apfel Integration Tests - BuildInfo.swift hygiene.
+apfel-plus Integration Tests - BuildInfo.swift hygiene.
 
 The `build` target must NOT depend on `generate-build-info` so that routine
 local dev commands (`make build`, `make install`, `make test`) do not leave

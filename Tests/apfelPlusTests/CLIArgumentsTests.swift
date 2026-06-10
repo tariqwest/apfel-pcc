@@ -75,7 +75,7 @@ func runCLIArgumentsTests() {
         try assertEqual(args.mode, .update)
     }
 
-    test("tag is no longer a subcommand - treated as a normal prompt (moved to apfel-tag)") {
+    test("tag is no longer a subcommand - treated as a normal prompt (moved to apfel-plus-tag)") {
         let args = try CLIArguments.parse(["tag"])
         try assertEqual(args.mode, .single)
         try assertEqual(args.prompt, "tag")

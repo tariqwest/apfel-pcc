@@ -1,13 +1,13 @@
 """
-apfel Integration Tests - Man page drift prevention.
+apfel-plus Integration Tests - Man page drift prevention.
 
-These tests keep `man/apfel.1.in` in lockstep with `apfel --help` and the
+These tests keep `man/apfel-plus.1.in` in lockstep with `apfel-plus --help` and the
 declared exit-code inventory. If the CLI grows or loses a flag / env var /
 exit code, one of these assertions will fail until the man page is updated.
 This is the core promise of the man-page automation - it cannot silently
 drift.
 
-Also lints the generated `apfel.1` with `mandoc -Tlint` so syntax errors
+Also lints the generated `apfel-plus.1` with `mandoc -Tlint` so syntax errors
 never reach a release.
 """
 
@@ -19,9 +19,9 @@ import subprocess
 import pytest
 
 ROOT = pathlib.Path(__file__).resolve().parents[2]
-BINARY = ROOT / ".build" / "release" / "apfel"
-MAN_PAGE = ROOT / ".build" / "release" / "apfel.1"
-MAN_SOURCE = ROOT / "man" / "apfel.1.in"
+BINARY = ROOT / ".build" / "release" / "apfel-plus"
+MAN_PAGE = ROOT / ".build" / "release" / "apfel-plus.1"
+MAN_SOURCE = ROOT / "man" / "apfel-plus.1.in"
 VERSION_FILE = ROOT / ".version"
 MAIN_SWIFT = ROOT / "Sources" / "main.swift"
 EXIT_CODES_SWIFT = ROOT / "Sources" / "CLI" / "ExitCodes.swift"
@@ -61,7 +61,7 @@ def _man_page_flag_sections() -> str:
     Everything above the FILES section covers SYNOPSIS, DESCRIPTION, OPTIONS,
     CONTEXT OPTIONS, SERVER OPTIONS, ENVIRONMENT, EXIT STATUS. Flags that
     appear later (in FILES/EXAMPLES/BUGS/SEE ALSO) are command examples or
-    documentation references, not apfel's own flag surface, and must not
+    documentation references, not apfel-plus's own flag surface, and must not
     be compared against `--help`.
     """
     text = _man_page_unescaped()
@@ -124,7 +124,7 @@ def test_man_page_renders_with_man():
     assert res.returncode == 0, (
         f"man {MAN_PAGE} failed (exit {res.returncode}):\n{res.stderr}"
     )
-    assert "apfel" in res.stdout.lower()
+    assert "apfel-plus" in res.stdout.lower()
 
 
 def test_version_matches_version_file():
@@ -132,7 +132,7 @@ def test_version_matches_version_file():
     expected = VERSION_FILE.read_text().strip()
     text = _man_page_text()
     first_line = text.splitlines()[0]
-    assert f'"apfel {expected}"' in first_line, (
+    assert f'"apfel-plus {expected}"' in first_line, (
         f"Expected version {expected!r} in .TH header, got:\n{first_line}"
     )
     # Placeholder must not survive into the generated page.
@@ -152,7 +152,7 @@ def test_bidirectional_long_flag_coverage():
 
     assert not missing_in_man, (
         f"Flags in --help but missing from man page: {sorted(missing_in_man)}. "
-        "Update man/apfel.1.in to document them."
+        "Update man/apfel-plus.1.in to document them."
     )
     assert not missing_in_help, (
         f"Flags in man page but missing from --help: {sorted(missing_in_help)}. "

@@ -1,6 +1,6 @@
 // ============================================================================
 // SecurityMiddleware.swift - Origin check, token auth, and CORS handling
-// Part of apfel - Apple Intelligence from the command line
+// Part of apfel-plus - Apple Intelligence from the command line
 // ============================================================================
 
 import Foundation

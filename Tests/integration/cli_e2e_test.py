@@ -1,5 +1,5 @@
 """
-apfel Integration Tests — CLI E2E
+apfel-plus Integration Tests — CLI E2E
 
 Exercises the release binary as a real UNIX tool:
 - help/version/exit codes
@@ -25,7 +25,7 @@ import pytest
 
 
 ROOT = pathlib.Path(__file__).resolve().parents[2]
-BINARY = ROOT / ".build" / "release" / "apfel"
+BINARY = ROOT / ".build" / "release" / "apfel-plus"
 ANSI_RE = re.compile(r"\x1b\[[0-9;]*m")
 
 
@@ -307,7 +307,7 @@ def test_help_exit_success():
 def test_version_exit_success():
     result = run_cli(["--version"])
     assert result.returncode == 0
-    assert result.stdout.startswith("apfel v")
+    assert result.stdout.startswith("apfel-plus v")
 
 
 def test_invalid_flag_exit_code():
@@ -513,7 +513,7 @@ def test_file_flag_unknown_binary_gives_utf8_error():
 
 
 def test_file_flag_with_prompt():
-    """apfel -f <file> <prompt> should prepend file content to the prompt."""
+    """apfel-plus -f <file> <prompt> should prepend file content to the prompt."""
     require_model()
     tmp = pathlib.Path("/tmp/apfel_test_file_flag.txt")
     tmp.write_text("The capital of Austria is Vienna.")
@@ -530,7 +530,7 @@ def test_file_flag_with_prompt():
 
 
 def test_file_flag_no_prompt():
-    """apfel -f <file> with no prompt argument should use file content as the prompt."""
+    """apfel-plus -f <file> with no prompt argument should use file content as the prompt."""
     require_model()
     tmp = pathlib.Path("/tmp/apfel_test_file_noprompt.txt")
     tmp.write_text("What is 2+2? Reply with just the number.")
@@ -547,7 +547,7 @@ def test_file_flag_no_prompt():
 
 
 def test_multiple_file_flags():
-    """apfel -f a.txt -f b.txt <prompt> should include content from both files."""
+    """apfel-plus -f a.txt -f b.txt <prompt> should include content from both files."""
     require_model()
     tmp_a = pathlib.Path("/tmp/apfel_test_multi_a.txt")
     tmp_b = pathlib.Path("/tmp/apfel_test_multi_b.txt")
@@ -583,7 +583,7 @@ def test_stdin_with_prompt_argument():
 
 
 def test_file_flag_with_stdin_and_prompt():
-    """apfel -f <file> <prompt> with piped stdin should include all three."""
+    """apfel-plus -f <file> <prompt> with piped stdin should include all three."""
     require_model()
     tmp = pathlib.Path("/tmp/apfel_test_file_stdin.txt")
     tmp.write_text("File content: The answer is 42.")
@@ -632,7 +632,7 @@ def test_stdin_only_with_stream_flag():
 
 
 def test_file_flag_with_stdin_and_stream():
-    """apfel -f <file> --stream <prompt> with piped stdin should include all three (GH-82)."""
+    """apfel-plus -f <file> --stream <prompt> with piped stdin should include all three (GH-82)."""
     require_model()
     tmp = pathlib.Path("/tmp/apfel_test_file_stdin_stream.txt")
     tmp.write_text("File content: The answer is 42.")
@@ -677,7 +677,7 @@ def test_update_flag_exits_success():
 def test_update_shows_version():
     """--update output should contain the current version."""
     result = run_cli(["--update"])
-    assert "apfel v" in result.stdout
+    assert "apfel-plus v" in result.stdout
 
 
 def test_update_detects_install_method():
@@ -724,8 +724,8 @@ def test_empty_pipe_quiet_suppresses_hint():
 
 
 def test_empty_file_redirect_no_hint(tmp_path):
-    """Empty regular-file redirect (`apfel "q" < empty.txt`) should NOT emit the
-    pipe hint - the hint is only useful for `command 2>&1 | apfel` (#152)."""
+    """Empty regular-file redirect (`apfel-plus "q" < empty.txt`) should NOT emit the
+    pipe hint - the hint is only useful for `command 2>&1 | apfel-plus` (#152)."""
     empty_file = tmp_path / "empty.txt"
     empty_file.write_text("")
     merged_env = os.environ.copy()

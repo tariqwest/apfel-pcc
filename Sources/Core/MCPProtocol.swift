@@ -19,7 +19,7 @@ public enum MCPProtocol {
         return jsonRPC(id: id, method: "initialize", params: [
             "protocolVersion": protocolVersion,
             "capabilities": [:] as [String: Any],
-            "clientInfo": ["name": "apfel", "version": "1.0.0"]
+            "clientInfo": ["name": "apfel-plus", "version": "1.0.0"]
         ])
     }
 

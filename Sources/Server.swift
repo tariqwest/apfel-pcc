@@ -1,6 +1,6 @@
 // ============================================================================
 // Server.swift — OpenAI-compatible HTTP server
-// Part of apfel — Apple Intelligence from the command line
+// Part of apfel-plus — Apple Intelligence from the command line
 // ============================================================================
 
 import Foundation
@@ -123,7 +123,7 @@ func startServer(config: ServerConfig, mcpManager: MCPManager? = nil) async thro
                 context_window: pccContextWindow,
                 supported_parameters: sharedParams,
                 unsupported_parameters: unsupportedParams,
-                notes: "Apple Private Cloud Compute via FoundationModels framework (macOS 27+). 32K context, no API keys, no account setup. Opt in per request with `model: \"\(ModelBackend.privateCloudCompute.canonicalModelID)\"` (aliases: pcc, apfel-pcc)."
+                notes: "Apple Private Cloud Compute via FoundationModels framework (macOS 27+). 32K context, no API keys, no account setup. Opt in per request with `model: \"\(ModelBackend.privateCloudCompute.canonicalModelID)\"` (aliases: pcc, apfel-plus-pcc)."
             ))
         }
         return jsonResponse(jsonString(ModelsListResponse(object: "list", data: entries)))
@@ -244,7 +244,7 @@ func startServer(config: ServerConfig, mcpManager: MCPManager? = nil) async thro
         ? "localhost only (\(config.allowedOrigins.joined(separator: ", ")))"
         : styled("disabled (all origins allowed)", .red)
     var bannerLines = [
-        "\(styled("apfel server", .cyan, .bold)) v\(version)",
+        "\(styled("apfel-plus server", .cyan, .bold)) v\(version)",
         "\(styled("├", .dim)) endpoint: http://\(config.host):\(config.port)",
         "\(styled("├", .dim)) model:    \(modelName)",
         "\(styled("├", .dim)) cors:     \(config.cors ? "enabled" : "disabled")",
@@ -281,7 +281,7 @@ func startServer(config: ServerConfig, mcpManager: MCPManager? = nil) async thro
         printStderr("")
         printStderr(styled("error: Port \(config.port) is already in use.", .red, .bold))
         printStderr("Another process (e.g. Ollama) may be listening on this port.")
-        printStderr("Fix: \(styled("apfel --serve --port <other-port>", .cyan)) or stop the other process.")
+        printStderr("Fix: \(styled("apfel-plus --serve --port <other-port>", .cyan)) or stop the other process.")
         exit(exitRuntimeError)
     }
 }

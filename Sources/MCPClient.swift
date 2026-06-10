@@ -1,6 +1,6 @@
 // ============================================================================
 // MCPClient.swift - MCP server connection and tool execution
-// Part of apfel - spawns MCP servers and manages tool calling
+// Part of apfel-plus - spawns MCP servers and manages tool calling
 // ============================================================================
 
 import Foundation
@@ -178,7 +178,7 @@ actor RemoteMCPConnection: Sendable {
         self.timeoutSeconds = timeoutSeconds
         // Ephemeral session: no shared cookie jar, no disk cache.
         let config = URLSessionConfiguration.ephemeral
-        config.httpAdditionalHeaders = ["User-Agent": "apfel/\(buildVersion)"]
+        config.httpAdditionalHeaders = ["User-Agent": "apfel-plus/\(buildVersion)"]
         self.session = URLSession(configuration: config)
 
         do {

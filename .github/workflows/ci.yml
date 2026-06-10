@@ -33,7 +33,7 @@ jobs:
         run: make build
 
       - name: Unit tests
-        run: swift run apfel-tests
+        run: swift run apfel-plus-tests
 
       - name: Install Python test dependencies
         run: pip3 install --break-system-packages pytest httpx
@@ -50,7 +50,7 @@ jobs:
             -v --tb=short
 
           # Man page drift tests (model-free): block any PR that adds/renames
-          # a flag, env var, or exit code without updating man/apfel.1.in.
+          # a flag, env var, or exit code without updating man/apfel-plus.1.in.
           python3 -m pytest Tests/integration/test_man_page.py -v --tb=short
 
           # Note: performance_test.py requires Apple Intelligence (benchmark runs inference).

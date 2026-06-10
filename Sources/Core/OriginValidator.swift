@@ -1,6 +1,6 @@
 // ============================================================================
 // OriginValidator.swift - Localhost CSRF protection logic
-// Part of apfel - Apple Intelligence from the command line
+// Part of apfel-plus - Apple Intelligence from the command line
 // ============================================================================
 
 /// Pure validation logic for origin checking and token authentication.

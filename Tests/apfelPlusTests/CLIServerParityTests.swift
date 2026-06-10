@@ -41,7 +41,7 @@ func runCLIServerParityTests() {
 
     test("permissive: main.swift wires --permissive into ServerConfig") {
         try assertTrue(mainSrc.contains("permissive: parsed.permissive"),
-                       "Sources/main.swift must pass parsed.permissive into ServerConfig (apfel --serve --permissive)")
+                       "Sources/main.swift must pass parsed.permissive into ServerConfig (apfel-plus --serve --permissive)")
     }
 
     test("permissive: handler reads from ServerConfig, not hard-coded false") {

@@ -1,6 +1,6 @@
 // ============================================================================
 // ChatLineEditor.swift — Minimal libedit-backed line editor for chat mode
-// Part of apfel — Apple Intelligence from the command line
+// Part of apfel-plus — Apple Intelligence from the command line
 // ============================================================================
 
 import Foundation

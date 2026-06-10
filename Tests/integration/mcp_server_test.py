@@ -1,12 +1,12 @@
 """
-apfel Integration Tests -- MCP auto-execution in server mode
+apfel-plus Integration Tests -- MCP auto-execution in server mode
 
-Validates that when apfel --serve --mcp <server> receives a chat completion
+Validates that when apfel-plus --serve --mcp <server> receives a chat completion
 request WITHOUT client-provided tools, it auto-executes MCP tool calls and
 returns the final text answer (not raw tool_calls).
 
 Requires: pip install pytest httpx
-Requires: apfel --serve --mcp mcp/calculator/server.py running on localhost:11435
+Requires: apfel-plus --serve --mcp mcp/calculator/server.py running on localhost:11435
 
 Run: python3 -m pytest Tests/integration/mcp_server_test.py -v
 
@@ -29,7 +29,7 @@ API_URL = f"{BASE_URL}/v1"
 MODEL = "apple-foundationmodel"
 TIMEOUT = 60
 ROOT = pathlib.Path(__file__).resolve().parents[2]
-BINARY = ROOT / ".build" / "release" / "apfel"
+BINARY = ROOT / ".build" / "release" / "apfel-plus"
 FIXTURES = ROOT / "Tests" / "integration" / "fixtures"
 
 

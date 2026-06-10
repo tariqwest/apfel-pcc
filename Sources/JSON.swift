@@ -1,6 +1,6 @@
 // ============================================================================
 // JSON.swift — JSON encoding helpers
-// Part of apfel — Apple Intelligence from the command line
+// Part of apfel-plus — Apple Intelligence from the command line
 // ============================================================================
 
 import Foundation

@@ -1,9 +1,9 @@
 """
-apfel Integration Tests - Security (Origin Check & Token Auth)
+apfel-plus Integration Tests - Security (Origin Check & Token Auth)
 
 Validates localhost CSRF protection and token authentication.
 Requires: pip install pytest httpx
-Requires: apfel --serve running on localhost:11434 (default config)
+Requires: apfel-plus --serve running on localhost:11434 (default config)
 Additional flag-specific tests launch their own release-binary server instances.
 
 Run: python3 -m pytest Tests/integration/security_test.py -v
@@ -22,7 +22,7 @@ import pytest
 import httpx
 
 ROOT = pathlib.Path(__file__).resolve().parents[2]
-BINARY = ROOT / ".build" / "release" / "apfel"
+BINARY = ROOT / ".build" / "release" / "apfel-plus"
 BASE_URL = "http://localhost:11434"
 
 

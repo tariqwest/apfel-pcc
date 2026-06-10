@@ -56,7 +56,7 @@ actor TokenCounter {
 
     /// Current availability as our pure ApfelCore enum. Adapts Apple's
     /// `SystemLanguageModel.Availability` into our `ModelAvailability`
-    /// so the rest of apfel can reason about the specific unavailable
+    /// so the rest of apfel-plus can reason about the specific unavailable
     /// reason without depending on FoundationModels.
     var availability: ModelAvailability {
         switch model.availability {

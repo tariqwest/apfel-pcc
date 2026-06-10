@@ -1,6 +1,6 @@
 #!/bin/bash
 # mac-narrator -- your Mac's inner monologue, powered by Apple Intelligence
-# Install globally as `apfel-mac-narrator`: see demo/README.md "Install demos globally (optional)"
+# Install globally as `apfel-plus-mac-narrator`: see demo/README.md "Install demos globally (optional)"
 #
 # One-shot:  mac-narrator
 # Watch:     mac-narrator --watch
@@ -8,7 +8,7 @@
 # Speak:     mac-narrator --say
 # Quiet:     mac-narrator --watch --threshold 50   (only narrate when score > 50)
 #
-# Requires: apfel installed (https://github.com/Arthur-Ficial/apfel)
+# Requires: apfel-plus installed (https://github.com/tariqwest/apfel-plus)
 
 INTERVAL=60
 WATCH=false
@@ -35,15 +35,15 @@ while [[ $# -gt 0 ]]; do
             echo "                       30 = only mildly interesting (a process > 30% CPU)"
             echo "                       70 = only dramatic (battery < 20%, memory full, etc.)"
             echo ""
-            echo "Requires: apfel (Apple Intelligence CLI)"
+            echo "Requires: apfel-plus (Apple Intelligence CLI)"
             exit 0
             ;;
         *) echo "Unknown option: $1. Use --help."; exit 1 ;;
     esac
 done
 
-if ! command -v apfel &>/dev/null; then
-    echo "Error: apfel not found. Install from https://github.com/Arthur-Ficial/apfel"
+if ! command -v apfel-plus &>/dev/null; then
+    echo "Error: apfel-plus not found. Install from https://github.com/tariqwest/apfel-plus"
     exit 1
 fi
 
@@ -146,7 +146,7 @@ narrate() {
     oneline=$(echo "$snapshot" | tr '\n' '; ')
 
     local comment
-    if comment=$(apfel -q --max-tokens 150 -s "$PROMPT" "System snapshot: $oneline"); then
+    if comment=$(apfel-plus -q --max-tokens 150 -s "$PROMPT" "System snapshot: $oneline"); then
         echo -e "\033[90m[$(date +%H:%M:%S)]\033[0m $comment"
         if $SAY; then
             say "$comment"

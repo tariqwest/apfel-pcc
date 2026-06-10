@@ -1,6 +1,6 @@
 # Server Security
 
-apfel's HTTP server (`--serve`) runs on localhost by default and is designed for local development and on-device inference. This document explains the security settings and how to configure them for your specific use case.
+apfel-plus's HTTP server (`--serve`) runs on localhost by default and is designed for local development and on-device inference. This document explains the security settings and how to configure them for your specific use case.
 
 ## How it works
 
@@ -9,11 +9,11 @@ The `Origin` HTTP header is the key. Browsers automatically attach it to cross-o
 ```
 Browser on evil.com -> fetch("http://localhost:11434/v1/chat/completions")
                        ^^ Browser adds: Origin: http://evil.com
-                       ^^ apfel sees foreign origin -> 403 Forbidden
+                       ^^ apfel-plus sees foreign origin -> 403 Forbidden
 
 curl http://localhost:11434/v1/chat/completions
      ^^ No Origin header sent
-     ^^ apfel sees no Origin -> allowed (backward compatible)
+     ^^ apfel-plus sees no Origin -> allowed (backward compatible)
 ```
 
 This single check protects against browser-based attacks while keeping all non-browser workflows unchanged.
@@ -23,11 +23,11 @@ This single check protects against browser-based attacks while keeping all non-b
 ## Default behavior
 
 ```bash
-apfel --serve
+apfel-plus --serve
 ```
 
 ```
-apfel server
+apfel-plus server
 ├ endpoint: http://127.0.0.1:11434
 ├ cors:     disabled
 ├ origin:   localhost only (http://127.0.0.1, http://localhost, http://[::1])
@@ -79,7 +79,7 @@ curl -H "Origin: http://localhost.evil.com" http://localhost:11434/v1/models
 Enables full CORS support: the server responds to OPTIONS preflight requests with the necessary `Access-Control-Allow-*` headers so browsers can make POST requests and send custom headers (like `Authorization`).
 
 ```bash
-apfel --serve --cors
+apfel-plus --serve --cors
 ```
 
 ```
@@ -117,7 +117,7 @@ curl -H "Origin: http://evil.com" http://localhost:11434/v1/models
 
 **Key insight:** `--cors` enables browser communication, but does NOT weaken the origin check. Foreign sites are still blocked.
 
-**When to use:** Your local web app needs to make `fetch()` calls to apfel. Without `--cors`, browsers block POST requests and requests with custom headers like `Authorization`.
+**When to use:** Your local web app needs to make `fetch()` calls to apfel-plus. Without `--cors`, browsers block POST requests and requests with custom headers like `Authorization`.
 
 ---
 
@@ -126,7 +126,7 @@ curl -H "Origin: http://evil.com" http://localhost:11434/v1/models
 Add specific origins to the default localhost allowlist. This is **additive** - localhost origins are always included.
 
 ```bash
-apfel --serve --cors --allowed-origins "http://myapp.local:8080"
+apfel-plus --serve --cors --allowed-origins "http://myapp.local:8080"
 ```
 
 ```
@@ -159,7 +159,7 @@ curl http://localhost:11434/v1/models
 **Multiple origins:**
 
 ```bash
-apfel --serve --cors --allowed-origins "http://localhost:3000,http://localhost:5173"
+apfel-plus --serve --cors --allowed-origins "http://localhost:3000,http://localhost:5173"
 ```
 
 **How matching works:**
@@ -182,7 +182,7 @@ apfel --serve --cors --allowed-origins "http://localhost:3000,http://localhost:5
 Disables the `Origin` header check entirely. Any origin is allowed.
 
 ```bash
-apfel --serve --no-origin-check
+apfel-plus --serve --no-origin-check
 ```
 
 ```
@@ -217,7 +217,7 @@ curl -H "Origin: http://anything.com" http://localhost:11434/v1/models
 Adds a second layer of security: every request must include a Bearer token. Works independently of origin checking.
 
 ```bash
-apfel --serve --token "my-secret-token"
+apfel-plus --serve --token "my-secret-token"
 ```
 
 ```
@@ -270,7 +270,7 @@ print(c.models.list().data[0].id)
 Like `--token` but auto-generates a UUID and prints it on startup so you can copy it.
 
 ```bash
-apfel --serve --token-auto
+apfel-plus --serve --token-auto
 ```
 
 ```
@@ -295,7 +295,7 @@ Set the token via environment variable. Useful for scripts and systemd services.
 
 ```bash
 export APFEL_TOKEN="my-secret-token"
-apfel --serve
+apfel-plus --serve
 # Banner shows: token: required (secret not echoed)
 ```
 
@@ -308,7 +308,7 @@ The `--token` flag overrides `APFEL_TOKEN`. The `--token-auto` flag overrides bo
 The shooting-yourself-in-the-foot-at-some-point-in-the-future option. Combines `--no-origin-check` and `--cors` to disable all security.
 
 ```bash
-apfel --serve --footgun
+apfel-plus --serve --footgun
 ```
 
 ```
@@ -391,10 +391,10 @@ This means:
 
 ### I'm building a local web app
 
-Your React/Vite/Next.js dev server on `localhost:3000` needs to call apfel:
+Your React/Vite/Next.js dev server on `localhost:3000` needs to call apfel-plus:
 
 ```bash
-apfel --serve --cors --allowed-origins "http://localhost:3000"
+apfel-plus --serve --cors --allowed-origins "http://localhost:3000"
 ```
 
 Your JavaScript:
@@ -416,7 +416,7 @@ const data = await response.json();
 Just run the server. Nothing extra needed:
 
 ```bash
-apfel --serve
+apfel-plus --serve
 
 # curl works as-is
 curl -X POST http://localhost:11434/v1/chat/completions \
@@ -433,7 +433,7 @@ client = OpenAI(base_url="http://localhost:11434/v1", api_key="ignored")
 Bind to all interfaces and add token auth:
 
 ```bash
-apfel --serve --host 0.0.0.0 --token-auto
+apfel-plus --serve --host 0.0.0.0 --token-auto
 # Share the printed token with people on your network
 ```
 
@@ -447,19 +447,19 @@ curl -H "Authorization: Bearer <token>" http://192.168.1.42:11434/health
 If you really need unauthenticated health probes on that network-exposed bind:
 
 ```bash
-apfel --serve --host 0.0.0.0 --token-auto --public-health
+apfel-plus --serve --host 0.0.0.0 --token-auto --public-health
 ```
 
-### I need multiple dev servers to access apfel
+### I need multiple dev servers to access apfel-plus
 
 ```bash
-apfel --serve --cors --allowed-origins "http://localhost:3000,http://localhost:5173,http://localhost:8080"
+apfel-plus --serve --cors --allowed-origins "http://localhost:3000,http://localhost:5173,http://localhost:8080"
 ```
 
 ### I want maximum security (locked down)
 
 ```bash
-apfel --serve --cors --allowed-origins "http://localhost:3000" --token "$(openssl rand -hex 16)"
+apfel-plus --serve --cors --allowed-origins "http://localhost:3000" --token "$(openssl rand -hex 16)"
 ```
 
 This gives you: origin restricted to one specific app + token auth required + CORS for that app only.
@@ -467,7 +467,7 @@ This gives you: origin restricted to one specific app + token auth required + CO
 ### Quick demo / hackathon
 
 ```bash
-apfel --serve --footgun
+apfel-plus --serve --footgun
 # WARNING banner printed - you know what you're doing
 ```
 

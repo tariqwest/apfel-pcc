@@ -1,6 +1,6 @@
 // ============================================================================
 // Retry.swift — AsyncSemaphore for server concurrency limiting
-// Part of apfel — Apple Intelligence from the command line
+// Part of apfel-plus — Apple Intelligence from the command line
 // ============================================================================
 // NOTE: withRetry() and isRetryableError() have been moved to
 // ApfelCore (Sources/Core/Retry.swift and Sources/Core/ApfelError.swift)

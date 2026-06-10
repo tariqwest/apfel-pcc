@@ -1,6 +1,6 @@
 // ============================================================================
 // Summarizer.swift — Context strategy: compress old history into a summary
-// Part of apfel — Apple Intelligence from the command line
+// Part of apfel-plus — Apple Intelligence from the command line
 //
 // Uses the on-device model itself to generate a summary of older turns,
 // keeping recent turns verbatim. Falls back to newest-first on failure.

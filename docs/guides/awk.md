@@ -7,8 +7,8 @@ Runnable scripts + tests: [Arthur-Ficial/apfel-guides-lab/scripts/awk](https://g
 ## Prerequisites
 
 - macOS 26+ Tahoe, Apple Silicon, Apple Intelligence enabled
-- `brew install apfel jq` (`jq` is only needed for the JSON-mode + tool-calling examples)
-- `apfel --serve` running (port `11434`)
+- `brew install apfel-plus jq` (`jq` is only needed for the JSON-mode + tool-calling examples)
+- `apfel-plus --serve` running (port `11434`)
 - `awk` (ships with macOS)
 
 ## 1. One-shot
@@ -118,7 +118,7 @@ tmp=$(mktemp)
 status=$(curl -sS -o "$tmp" -w '%{http_code}' \
   http://localhost:11434/v1/embeddings \
   -H "Content-Type: application/json" \
-  -d '{"model":"apple-foundationmodel","input":"apfel runs 100% on-device."}')
+  -d '{"model":"apple-foundationmodel","input":"apfel-plus runs 100% on-device."}')
 
 if [[ "$status" -ge 400 ]]; then
   msg=$(awk 'BEGIN { RS="\"message\" :" } NR==2 {
@@ -160,7 +160,7 @@ Lab script: [`05_tools.sh`](https://github.com/Arthur-Ficial/apfel-guides-lab/bl
 
 ## 6. Real example - summarize stdin
 
-AWK does what AWK is good at - text cleanup - then hands the clean text to apfel:
+AWK does what AWK is good at - text cleanup - then hands the clean text to apfel-plus:
 
 ```bash
 cleaned=$(awk '
@@ -203,7 +203,7 @@ Lab script: [`06_example.sh`](https://github.com/Arthur-Ficial/apfel-guides-lab/
 
 ## Tested with
 
-- apfel v1.0.3 / macOS 26.3.1 Apple Silicon
+- apfel-plus v1.0.3 / macOS 26.3.1 Apple Silicon
 - BSD awk 20200816 (system) / jq 1.7 / curl
 - Date: 2026-04-16
 

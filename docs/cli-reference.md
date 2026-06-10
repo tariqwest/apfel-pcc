@@ -1,24 +1,24 @@
 # CLI Reference
 
-`apfel` has four primary modes: single prompt, `--stream`, `--chat`, and `--serve`. This page is the full flag, exit-code, and environment reference for the installed CLI.
+`apfel-plus` has four primary modes: single prompt, `--stream`, `--chat`, and `--serve`. This page is the full flag, exit-code, and environment reference for the installed CLI.
 
 ## Modes
 
 ```text
 MODES
-  apfel <prompt>                          Single prompt (default)
-  apfel --stream <prompt>                 Stream response tokens
-  apfel --chat                            Interactive conversation
-  apfel --serve                           Start OpenAI-compatible server
-  apfel --benchmark                       Run internal performance benchmarks
+  apfel-plus <prompt>                          Single prompt (default)
+  apfel-plus --stream <prompt>                 Stream response tokens
+  apfel-plus --chat                            Interactive conversation
+  apfel-plus --serve                           Start OpenAI-compatible server
+  apfel-plus --benchmark                       Run internal performance benchmarks
 
 INPUT
-  apfel -f, --file <path> <prompt>        Attach file content (repeatable)
-  apfel -s, --system <text> <prompt>      Set system prompt
-  apfel --system-file <path> <prompt>     Read system prompt from file
-  apfel --mcp <path|url> <prompt>         Attach local or remote MCP tool server (repeatable)
-  apfel --mcp-token <token> <prompt>      Bearer token for remote MCP servers
-  apfel --mcp-timeout <n> <prompt>        MCP timeout in seconds [default: 5]
+  apfel-plus -f, --file <path> <prompt>        Attach file content (repeatable)
+  apfel-plus -s, --system <text> <prompt>      Set system prompt
+  apfel-plus --system-file <path> <prompt>     Read system prompt from file
+  apfel-plus --mcp <path|url> <prompt>         Attach local or remote MCP tool server (repeatable)
+  apfel-plus --mcp-token <token> <prompt>      Bearer token for remote MCP servers
+  apfel-plus --mcp-timeout <n> <prompt>        MCP timeout in seconds [default: 5]
 
 OUTPUT
   -o, --output <fmt>                      Output format: plain, json
@@ -64,96 +64,96 @@ META
 
 ```bash
 # -f, --file - attach file content to prompt (repeatable)
-apfel -f main.swift "Explain this code"
-apfel -f before.txt -f after.txt "What changed?"
+apfel-plus -f main.swift "Explain this code"
+apfel-plus -f before.txt -f after.txt "What changed?"
 
 # -s, --system - set a system prompt
-apfel -s "You are a pirate" "What is recursion?"
-apfel -s "Reply in JSON only" "List 3 colors"
+apfel-plus -s "You are a pirate" "What is recursion?"
+apfel-plus -s "Reply in JSON only" "List 3 colors"
 
 # --system-file - read system prompt from a file
-apfel --system-file persona.txt "Introduce yourself"
+apfel-plus --system-file persona.txt "Introduce yourself"
 
 # --mcp, --mcp-token, --mcp-timeout
-apfel --mcp ./mcp/calculator/server.py "What is 15 times 27?"
-apfel --mcp ./calc.py --mcp ./weather.py "Use both tools"
-apfel --mcp https://mcp.example.com/v1 "Remote MCP server"
-APFEL_MCP_TOKEN=mytoken apfel --mcp https://mcp.example.com/v1 "With auth"
-apfel --mcp-timeout 30 --mcp ./slow-remote-server.py "hello"
+apfel-plus --mcp ./mcp/calculator/server.py "What is 15 times 27?"
+apfel-plus --mcp ./calc.py --mcp ./weather.py "Use both tools"
+apfel-plus --mcp https://mcp.example.com/v1 "Remote MCP server"
+APFEL_MCP_TOKEN=mytoken apfel-plus --mcp https://mcp.example.com/v1 "With auth"
+apfel-plus --mcp-timeout 30 --mcp ./slow-remote-server.py "hello"
 
 # -o, --output
-apfel -o json "Translate to German: hello" | jq .content
+apfel-plus -o json "Translate to German: hello" | jq .content
 
 # -q, --quiet
-apfel -q "Give me a UUID"
+apfel-plus -q "Give me a UUID"
 
 # --no-color
-NO_COLOR=1 apfel "Hello"
+NO_COLOR=1 apfel-plus "Hello"
 
 # --temperature
-apfel --temperature 0.0 "What is 2+2?"
-apfel --temperature 1.5 "Write a wild poem"
+apfel-plus --temperature 0.0 "What is 2+2?"
+apfel-plus --temperature 1.5 "Write a wild poem"
 
 # --top-p
-apfel --top-p 0.9 "Write a short poem"
+apfel-plus --top-p 0.9 "Write a short poem"
 
 # --seed
-apfel --seed 42 "Tell me a joke"
+apfel-plus --seed 42 "Tell me a joke"
 
 # --max-tokens
-apfel --max-tokens 50 "Explain quantum computing"
+apfel-plus --max-tokens 50 "Explain quantum computing"
 
 # --permissive
-apfel --permissive "Write a villain monologue"
-apfel --permissive -f long-document.md "Summarize this"
+apfel-plus --permissive "Write a villain monologue"
+apfel-plus --permissive -f long-document.md "Summarize this"
 
 # --retry
-apfel --retry "What is 2+2?"
+apfel-plus --retry "What is 2+2?"
 
 # --debug
-apfel --debug "Hello world"
-apfel --serve --debug
+apfel-plus --debug "Hello world"
+apfel-plus --serve --debug
 
 # --stream
-apfel --stream "Write a haiku about code"
+apfel-plus --stream "Write a haiku about code"
 
 # --chat
-apfel --chat
-apfel --chat -s "You are a helpful coding assistant"
+apfel-plus --chat
+apfel-plus --chat -s "You are a helpful coding assistant"
 
 # --context-strategy
-apfel --chat --context-strategy newest-first
-apfel --chat --context-strategy sliding-window --context-max-turns 6
-apfel --chat --context-strategy summarize
-apfel --chat --context-output-reserve 256
-apfel --chat --context-status
+apfel-plus --chat --context-strategy newest-first
+apfel-plus --chat --context-strategy sliding-window --context-max-turns 6
+apfel-plus --chat --context-strategy summarize
+apfel-plus --chat --context-output-reserve 256
+apfel-plus --chat --context-status
 
 # --serve
-apfel --serve
-apfel --serve --port 3000 --host 0.0.0.0
+apfel-plus --serve
+apfel-plus --serve --port 3000 --host 0.0.0.0
 
 # --cors, --token, --footgun
-apfel --serve --cors
-apfel --serve --token "my-secret-token"
-apfel --serve --footgun
+apfel-plus --serve --cors
+apfel-plus --serve --token "my-secret-token"
+apfel-plus --serve --footgun
 
 # --token-auto, --public-health
-apfel --serve --token-auto --host 0.0.0.0 --public-health
+apfel-plus --serve --token-auto --host 0.0.0.0 --public-health
 
 # --allowed-origins, --no-origin-check
-apfel --serve --allowed-origins "https://myapp.com,https://staging.myapp.com"
-apfel --serve --no-origin-check
+apfel-plus --serve --allowed-origins "https://myapp.com,https://staging.myapp.com"
+apfel-plus --serve --no-origin-check
 
 # --max-concurrent
-apfel --serve --max-concurrent 2
+apfel-plus --serve --max-concurrent 2
 
 # --benchmark, --model-info, --update, --release, --version, --help
-apfel --benchmark -o json | jq '.benchmarks[] | {name, speedup_ratio}'
-apfel --model-info
-apfel --update
-apfel --release
-apfel --version
-apfel --help
+apfel-plus --benchmark -o json | jq '.benchmarks[] | {name, speedup_ratio}'
+apfel-plus --model-info
+apfel-plus --update
+apfel-plus --release
+apfel-plus --version
+apfel-plus --help
 ```
 
 Security details live in [server-security.md](server-security.md). Background-service usage lives in [background-service.md](background-service.md).

@@ -33,7 +33,7 @@ check "swift available" "swift --version"
 check "make available" "make --version"
 check "swift build (debug)" "swift build"
 check "swift build (release)" "swift build -c release"
-check "unit tests pass" "swift run apfel-tests"
+check "unit tests pass" "swift run apfel-plus-tests"
 
 echo ""
 echo "Results: $PASS passed, $FAIL failed"

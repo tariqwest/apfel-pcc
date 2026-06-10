@@ -1,5 +1,5 @@
 // ============================================================================
-// OutputFormat.swift - Output format enum for the apfel CLI
+// OutputFormat.swift - Output format enum for the apfel-plus CLI
 // Part of ApfelCLI - CLI-specific types, separate from ApfelCore domain logic
 // ============================================================================
 

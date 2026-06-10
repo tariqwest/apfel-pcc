@@ -1,6 +1,6 @@
 // ============================================================================
 // Logging.swift — Request logging with ring buffer and query API
-// Part of apfel — Apple Intelligence from the command line
+// Part of apfel-plus — Apple Intelligence from the command line
 // ============================================================================
 
 import Foundation

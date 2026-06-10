@@ -1,12 +1,12 @@
 #!/bin/bash
 # port — what's using this port?, powered by Apple Intelligence
-# Install globally as `apfel-port`: see demo/README.md "Install demos globally (optional)"
+# Install globally as `apfel-plus-port`: see demo/README.md "Install demos globally (optional)"
 #
 # Usage:  port 3000
 #         port 8080
 #         port 5432 -c    # copy to clipboard
 #
-# Requires: apfel installed (https://github.com/Arthur-Ficial/apfel)
+# Requires: apfel-plus installed (https://github.com/tariqwest/apfel-plus)
 
 COPY=false
 
@@ -26,7 +26,7 @@ while [[ $# -gt 0 ]]; do
             echo "  port 8080"
             echo "  port 5432"
             echo ""
-            echo "Requires: apfel (Apple Intelligence CLI)"
+            echo "Requires: apfel-plus (Apple Intelligence CLI)"
             exit 0
             ;;
         -*) echo "Unknown option: $1. Use --help."; exit 1 ;;
@@ -45,9 +45,9 @@ if ! [[ "$PORT" =~ ^[0-9]+$ ]]; then
     exit 1
 fi
 
-# Check apfel is installed
-if ! command -v apfel &>/dev/null; then
-    echo "Error: apfel not found. Install from https://github.com/Arthur-Ficial/apfel"
+# Check apfel-plus is installed
+if ! command -v apfel-plus &>/dev/null; then
+    echo "Error: apfel-plus not found. Install from https://github.com/tariqwest/apfel-plus"
     exit 1
 fi
 
@@ -62,11 +62,11 @@ fi
 SYSTEM="Explain in 1-2 sentences what process is using this port. Mention the process name, PID, and what the process likely is (e.g., 'Node.js dev server', 'PostgreSQL database', 'nginx web server'). If multiple processes, mention all. Be specific."
 
 result=$(echo "Port $PORT:
-$info" | apfel -q -s "$SYSTEM")
+$info" | apfel-plus -q -s "$SYSTEM")
 status=$?
 
 if [[ $status -ne 0 ]]; then
-    echo "Error: apfel failed (exit $status)" >&2
+    echo "Error: apfel-plus failed (exit $status)" >&2
     # Fallback: just show raw lsof output
     echo "$info"
     exit $status

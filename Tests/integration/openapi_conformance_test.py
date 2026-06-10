@@ -1,18 +1,18 @@
 """
-apfel Integration Tests -- OpenAI Official Spec Conformance
+apfel-plus Integration Tests -- OpenAI Official Spec Conformance
 
-Validates apfel's HTTP responses against the OFFICIAL OpenAI API spec
+Validates apfel-plus's HTTP responses against the OFFICIAL OpenAI API spec
 (vendored at Tests/integration/openai_spec/openapi.yaml) using
 openapi-core's runtime validator. No manual schema maintenance --
 if OpenAI updates their spec, we refresh the YAML and any new drift
 shows up automatically.
 
-This is complementary to openapi_spec_test.py which tests apfel-specific
+This is complementary to openapi_spec_test.py which tests apfel-plus-specific
 invariants (ID format, enum values) that the generic spec can't cover.
 
 Requires: pip install openapi-core httpx
-Requires: apfel --serve running on localhost:11434
-          apfel --serve --mcp mcp/calculator/server.py running on localhost:11435
+Requires: apfel-plus --serve running on localhost:11434
+          apfel-plus --serve --mcp mcp/calculator/server.py running on localhost:11435
 
 Run: python3 -m pytest Tests/integration/openapi_conformance_test.py -v
 """
@@ -235,7 +235,7 @@ class TestErrorConformance:
             json={"model": MODEL, "input": "test"},
             timeout=TIMEOUT,
         )
-        # apfel returns 501 for unsupported endpoints. The OpenAI spec
+        # apfel-plus returns 501 for unsupported endpoints. The OpenAI spec
         # doesn't define 501 responses, so we validate the error body
         # structure manually rather than against the spec.
         assert resp.status_code == 501

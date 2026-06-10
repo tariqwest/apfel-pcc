@@ -1,6 +1,6 @@
 // ============================================================================
 // CLI.swift — Command-line interface commands
-// Part of apfel — Apple Intelligence from the command line
+// Part of apfel-plus — Apple Intelligence from the command line
 // ============================================================================
 
 import FoundationModels
@@ -71,7 +71,7 @@ func singlePrompt(_ prompt: String, systemPrompt: String?, stream: Bool, options
     }
 
     if result.finishReason == .length {
-        printStderr("\(styled("apfel:", .yellow)) response truncated at the context window (finish_reason=length). Pass --max-tokens to control the cap explicitly.")
+        printStderr("\(styled("apfel-plus:", .yellow)) response truncated at the context window (finish_reason=length). Pass --max-tokens to control the cap explicitly.")
     }
 }
 
@@ -96,7 +96,7 @@ func chat(systemPrompt: String?, options: SessionOptions = .defaults, mcpManager
         // Build session with ALL tool schemas as text instructions and NO native
         // toolDefinitions. Native defs cause the FoundationModels framework to
         // intercept tool calls instead of surfacing them as text in the stream.
-        // apfel uses out-of-band text detection (ToolCallHandler.detectToolCall),
+        // apfel-plus uses out-of-band text detection (ToolCallHandler.detectToolCall),
         // so native interception breaks tool execution in chat mode (#144).
         var instrParts: [String] = []
         if let sys = systemPrompt { instrParts.append(sys) }
@@ -278,7 +278,7 @@ func printModelInfo() async {
         : styled(availability.shortLabel, .red)
 
     print("""
-    \(styled("apfel", .cyan, .bold)) v\(version) — model info
+    \(styled("apfel-plus", .cyan, .bold)) v\(version) — model info
     \(styled("├", .dim)) model:      \(modelName)
     \(styled("├", .dim)) on-device:  true (always)
     \(styled("├", .dim)) available:  \(availabilityLine)
@@ -318,7 +318,7 @@ func printRelease() {
     \(styled("└", .dim)) strategies: newest-first, oldest-first, sliding-window, summarize, strict
 
     \(styled("LINKS:", .yellow, .bold))
-    \(styled("├", .dim)) repo:       https://github.com/Arthur-Ficial/apfel
+    \(styled("├", .dim)) repo:       https://github.com/tariqwest/apfel-plus
     \(styled("├", .dim)) gui:        https://github.com/Arthur-Ficial/apfel-gui
     \(styled("└", .dim)) requires:   macOS 26+, Apple Silicon, Apple Intelligence enabled
     """)
@@ -326,7 +326,7 @@ func printRelease() {
 
 // MARK: - Self-Update
 
-/// Check for updates and optionally run `brew upgrade apfel`.
+/// Check for updates and optionally run `brew upgrade apfel-plus`.
 /// Detects install method from the binary path, prompts y/N on TTY.
 func performUpdate() {
     let current = version
@@ -340,17 +340,17 @@ func performUpdate() {
         print("\(appName) v\(current) (installed via Homebrew)")
     case .macports:
         print("\(appName) v\(current) (installed via MacPorts)")
-        print("To update: sudo port sync && sudo port update apfel")
+        print("To update: sudo port sync && sudo port update apfel-plus")
         return
     case .source:
         print("\(appName) v\(current) (installed from source)")
         print("To update: git pull && make install")
-        print("Or visit: https://github.com/Arthur-Ficial/apfel/releases")
+        print("Or visit: https://github.com/tariqwest/apfel-plus/releases")
         return
     }
 
     // Check for updates via brew
-    let outdatedJSON = shellOutput("/opt/homebrew/bin/brew", args: ["info", "--json=v2", "apfel"])
+    let outdatedJSON = shellOutput("/opt/homebrew/bin/brew", args: ["info", "--json=v2", "apfel-plus"])
     guard let data = outdatedJSON.data(using: .utf8),
           let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
           let formulae = json["formulae"] as? [[String: Any]],
@@ -358,7 +358,7 @@ func performUpdate() {
           let installed = formula["installed"] as? [[String: Any]],
           let installedVersion = installed.first?["version"] as? String,
           let stable = (formula["versions"] as? [String: Any])?["stable"] as? String else {
-        print("Could not check for updates. Try: brew upgrade apfel")
+        print("Could not check for updates. Try: brew upgrade apfel-plus")
         return
     }
 
@@ -372,7 +372,7 @@ func performUpdate() {
 
     // Non-interactive: report only
     guard isatty(STDIN_FILENO) != 0 else {
-        print("Run `apfel --update` in a terminal to update.")
+        print("Run `apfel-plus --update` in a terminal to update.")
         return
     }
 
@@ -383,13 +383,13 @@ func performUpdate() {
         return
     }
 
-    print(styled("Running: brew upgrade apfel", .dim))
-    let result = shellPassthrough("/opt/homebrew/bin/brew", args: ["upgrade", "apfel"])
+    print(styled("Running: brew upgrade apfel-plus", .dim))
+    let result = shellPassthrough("/opt/homebrew/bin/brew", args: ["upgrade", "apfel-plus"])
     if result == 0 {
-        let newVersion = shellOutput("/opt/homebrew/bin/apfel", args: ["--version"]).trimmingCharacters(in: .whitespacesAndNewlines)
+        let newVersion = shellOutput("/opt/homebrew/bin/apfel-plus", args: ["--version"]).trimmingCharacters(in: .whitespacesAndNewlines)
         print(styled("Updated to \(newVersion)", .green))
     } else {
-        printError("brew upgrade failed (exit \(result)). Try manually: brew upgrade apfel")
+        printError("brew upgrade failed (exit \(result)). Try manually: brew upgrade apfel-plus")
     }
 }
 

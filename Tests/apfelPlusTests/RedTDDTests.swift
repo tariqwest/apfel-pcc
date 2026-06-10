@@ -8,7 +8,7 @@
 // Bugs in the executable target (#175/#176/#179/#182) and the feature tickets
 // (#167-#171) are red-tested at the wire/CLI boundary in
 // Tests/integration/test_tdd_red.py - they cannot be reached from this
-// pure-library test target (see Package.swift: apfel-tests depends only on
+// pure-library test target (see Package.swift: apfel-plus-tests depends only on
 // ApfelCore + ApfelCLI).
 // ============================================================================
 

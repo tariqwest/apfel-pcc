@@ -3,11 +3,11 @@
 import PackageDescription
 
 let package = Package(
-    name: "apfel",
+    name: "apfel-plus",
     platforms: [.macOS(.v26)],
     products: [
         .library(name: "ApfelCore", targets: ["ApfelCore"]),
-        .executable(name: "apfel", targets: ["apfel"])
+        .executable(name: "apfel-plus", targets: ["apfel-plus"])
     ],
     dependencies: [
         .package(url: "https://github.com/hummingbird-project/hummingbird.git", from: "2.0.0"),
@@ -32,7 +32,7 @@ let package = Package(
         ),
         // Main executable — depends on ApfelCore + ApfelCLI + Hummingbird + FoundationModels
         .executableTarget(
-            name: "apfel",
+            name: "apfel-plus",
             dependencies: [
                 .product(name: "Hummingbird", package: "hummingbird"),
                 "ApfelCore",
@@ -52,9 +52,9 @@ let package = Package(
         ),
         // Test runner — pure Swift, no XCTest/Testing (Command Line Tools only)
         .executableTarget(
-            name: "apfel-tests",
+            name: "apfel-plus-tests",
             dependencies: ["ApfelCore", "ApfelCLI"],
-            path: "Tests/apfelTests"
+            path: "Tests/apfelPlusTests"
         ),
         .executableTarget(
             name: "apfelcore-context-strategies-example",

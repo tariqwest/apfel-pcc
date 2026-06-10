@@ -2,7 +2,7 @@
 
 ## Overview
 
-apfel uses semantic versioning. Releases are fully automated through the local `make release` workflow. Local builds (`make build`, `make install`) never change the version number.
+apfel-plus uses semantic versioning. Releases are fully automated through the local `make release` workflow. Local builds (`make build`, `make install`) never change the version number.
 
 ## The release flow
 
@@ -69,12 +69,12 @@ This runs locally via `scripts/publish-release.sh` (not on GitHub Actions - GitH
 1. Preflight checks (clean tree, on main, up to date with origin)
 2. Bumps `.version` via `make release-patch` / `release-minor` / `release-major`
 3. Builds the release binary
-4. Runs all unit tests via `swift run apfel-tests`
+4. Runs all unit tests via `swift run apfel-plus-tests`
 5. Runs all integration tests discovered under `Tests/integration/` with real Apple Intelligence
 6. Commits `.version`, `README.md`, `Sources/BuildInfo.swift`, tags, and pushes to main
-7. Packages `apfel-<version>-arm64-macos.tar.gz`
+7. Packages `apfel-plus-<version>-arm64-macos.tar.gz`
 8. Publishes GitHub Release with changelog and tarball
-9. Updates the Homebrew tap formula (`Arthur-Ficial/homebrew-tap`)
+9. Updates the Homebrew tap formula (`tariqwest/homebrew-tap`)
 
 Total time: ~5 minutes.
 
@@ -88,17 +88,17 @@ Verifies: GitHub Release exists with tarball, git tag exists, .version matches, 
 
 ## Homebrew-core distribution
 
-apfel is in [homebrew-core](https://github.com/Homebrew/homebrew-core). We do NOT maintain the formula directly.
+apfel-plus is in [homebrew-core](https://github.com/Homebrew/homebrew-core). We do NOT maintain the formula directly.
 
 ```bash
-brew install apfel
-brew upgrade apfel
+brew install apfel-plus
+brew upgrade apfel-plus
 ```
 
 - Homebrew's autobump bot picks up new GitHub Releases automatically
-- Emergency formula update: `brew bump-formula-pr apfel --url=<tarball-url> --sha256=<hash>`
+- Emergency formula update: `brew bump-formula-pr apfel-plus --url=<tarball-url> --sha256=<hash>`
 
-The release workflow also updates the custom tap (`Arthur-Ficial/homebrew-tap`) as a secondary channel for apfel-family tools. The `HOMEBREW_TAP_PUSH_TOKEN` secret is required for tap updates.
+The release workflow also updates the custom tap (`tariqwest/homebrew-tap`) as a secondary channel for apfel-plus-family tools. The `HOMEBREW_TAP_PUSH_TOKEN` secret is required for tap updates.
 
 ## GitHub CI vs local testing
 
@@ -114,15 +114,15 @@ Each release is published through three channels. All three pull the same signed
 
 | Channel | How fresh | Mechanism |
 |---------|-----------|-----------|
-| [homebrew-core](https://github.com/Homebrew/homebrew-core/blob/master/Formula/a/apfel.rb) (`brew install apfel`) | Up to ~24h after release | Homebrew `autobump-PR` bot detects new GitHub Releases and opens a formula-bump PR. |
-| [Arthur-Ficial/homebrew-tap](https://github.com/Arthur-Ficial/homebrew-tap) (`brew install Arthur-Ficial/tap/apfel`) | Synchronous with release | `scripts/publish-release.sh` pushes the new formula directly as part of `make release`. |
-| [nixpkgs](https://github.com/NixOS/nixpkgs/tree/master/pkgs/by-name/ap/apfel-llm) (`nix profile install nixpkgs#apfel-llm`) | Within ~7 days | Community [`r-ryantm`](https://github.com/ryantm/nixpkgs-update) bot picks up the new version via the package's `passthru.updateScript`. No release-side action from us. See [nixpkgs.md](nixpkgs.md). |
+| [homebrew-core](https://github.com/Homebrew/homebrew-core/blob/master/Formula/a/apfel-plus.rb) (`brew install apfel-plus`) | Up to ~24h after release | Homebrew `autobump-PR` bot detects new GitHub Releases and opens a formula-bump PR. |
+| [tariqwest/homebrew-tap](https://github.com/tariqwest/homebrew-tap) (`brew install tariqwest/tap/apfel-plus`) | Synchronous with release | `scripts/publish-release.sh` pushes the new formula directly as part of `make release`. |
+| [nixpkgs](https://github.com/NixOS/nixpkgs/tree/master/pkgs/by-name/ap/apfel-plus-llm) (`nix profile install nixpkgs#apfel-plus-llm`) | Within ~7 days | Community [`r-ryantm`](https://github.com/ryantm/nixpkgs-update) bot picks up the new version via the package's `passthru.updateScript`. No release-side action from us. See [nixpkgs.md](nixpkgs.md). |
 
 All three channels are "owned" in the sense that we file PRs against them and respond to reviewer feedback - but merges into homebrew-core and nixpkgs are gated by their respective maintainer communities. The tap is the only channel where we merge directly.
 
 ## Versioning rules
 
-apfel follows semver. See [STABILITY.md](../STABILITY.md) for the full stability policy.
+apfel-plus follows semver. See [STABILITY.md](../STABILITY.md) for the full stability policy.
 
 - **PATCH** (1.0.x): bug fixes, documentation, CI improvements
 - **MINOR** (1.x.0): new flags, new endpoints, backward-compatible features, additive public `ApfelCore` API

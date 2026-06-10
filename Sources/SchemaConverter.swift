@@ -1,6 +1,6 @@
 // ============================================================================
 // SchemaConverter.swift — Convert OpenAI JSON schemas to native FoundationModels types
-// Part of apfel — Apple Intelligence from the command line
+// Part of apfel-plus — Apple Intelligence from the command line
 //
 // The pure JSON -> SchemaIR parsing lives in ApfelCore/SchemaParser.swift and
 // is unit-tested there. This file keeps only:

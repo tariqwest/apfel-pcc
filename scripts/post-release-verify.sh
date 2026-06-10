@@ -54,14 +54,14 @@ if command -v apfel >/dev/null 2>&1; then
         echo "(Mismatch is OK if you haven't run brew upgrade yet)"
     fi
 else
-    echo "apfel not in PATH (install with: brew install apfel)"
+    echo "apfel not in PATH (install with: brew install apfel-plus)"
 fi
 
 # --- 5. Homebrew (informational) ---
 step "Homebrew (informational)"
 echo "homebrew-core autobump is async - may take up to 24h."
 echo "Check: brew info apfel"
-echo "Manual bump: brew bump-formula-pr apfel --url=<tarball-url> --sha256=<hash>"
+echo "Manual bump: brew bump-formula-pr apfel-plus --url=<tarball-url> --sha256=<hash>"
 
 # --- Summary ---
 step "Summary"

@@ -7,8 +7,8 @@ Runnable scripts + tests: [Arthur-Ficial/apfel-guides-lab/scripts/perl](https://
 ## Prerequisites
 
 - macOS 26+ Tahoe, Apple Silicon, Apple Intelligence enabled
-- `brew install apfel`
-- `apfel --serve` running (port `11434`)
+- `brew install apfel-plus`
+- `apfel-plus --serve` running (port `11434`)
 - Perl 5.34+ (ships with macOS at `/usr/bin/perl`)
 
 No `cpanm` required - `HTTP::Tiny` and `JSON::PP` are core modules.
@@ -140,7 +140,7 @@ Lab script: [`03_json.pl`](https://github.com/Arthur-Ficial/apfel-guides-lab/blo
 my $res = HTTP::Tiny->new->request(
     POST => 'http://localhost:11434/v1/embeddings',
     { headers => { 'Content-Type' => 'application/json' },
-      content => encode_json({ model => 'apple-foundationmodel', input => 'apfel runs 100% on-device.' }) }
+      content => encode_json({ model => 'apple-foundationmodel', input => 'apfel-plus runs 100% on-device.' }) }
 );
 
 if ($res->{status} >= 400) {
@@ -228,7 +228,7 @@ Lab script: [`06_example.pl`](https://github.com/Arthur-Ficial/apfel-guides-lab/
 
 ## Tested with
 
-- apfel v1.0.3 / macOS 26.3.1 Apple Silicon
+- apfel-plus v1.0.3 / macOS 26.3.1 Apple Silicon
 - Perl 5.34.1 (system) / HTTP::Tiny 0.076 / JSON::PP 4.06
 - Date: 2026-04-16
 

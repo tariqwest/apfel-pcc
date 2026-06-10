@@ -1,11 +1,11 @@
 """
-apfel Integration Tests -- Demo Script Packaging
+apfel-plus Integration Tests -- Demo Script Packaging
 
-Pins the brew install shape that ships demo/*  as apfel-<name> companion
+Pins the brew install shape that ships demo/*  as apfel-plus-<name> companion
 commands. Verifies:
   1. Tarball produced by `make package-release-asset` (if present) bundles demo/.
   2. The homebrew tap formula generator writes a `def install` block that
-     installs demo/ and creates apfel-<name> symlinks for every demo script.
+     installs demo/ and creates apfel-plus-<name> symlinks for every demo script.
 
 Run: python3 -m pytest Tests/integration/test_demo_packaging.py -v
 Requires nothing model-related -- pure packaging assertions.
@@ -40,7 +40,7 @@ def test_demo_directory_has_every_expected_script():
 
 
 def test_formula_generator_installs_demo_pkgshare(tmp_path):
-    output = tmp_path / "apfel.rb"
+    output = tmp_path / "apfel-plus.rb"
     subprocess.run(
         [
             "bash",
@@ -61,7 +61,7 @@ def test_formula_generator_installs_demo_pkgshare(tmp_path):
 
 
 def test_formula_generator_installs_every_demo_symlink(tmp_path):
-    output = tmp_path / "apfel.rb"
+    output = tmp_path / "apfel-plus.rb"
     subprocess.run(
         [
             "bash",
@@ -79,12 +79,12 @@ def test_formula_generator_installs_every_demo_symlink(tmp_path):
     for name in EXPECTED_DEMOS:
         assert name in text, f"formula should reference demo/{name}"
     assert "bin.install_symlink" in text, (
-        "formula should symlink demos into bin with apfel- prefix"
+        "formula should symlink demos into bin with apfel-plus- prefix"
     )
 
 
 def test_formula_generator_exposes_demos_in_caveats(tmp_path):
-    output = tmp_path / "apfel.rb"
+    output = tmp_path / "apfel-plus.rb"
     subprocess.run(
         [
             "bash",
@@ -101,13 +101,13 @@ def test_formula_generator_exposes_demos_in_caveats(tmp_path):
     text = output.read_text()
     # Caveats list every demo by its installed name so users can discover them.
     for name in EXPECTED_DEMOS:
-        assert f"apfel-{name}" in text, (
-            f"caveats should advertise apfel-{name} so users can discover it"
+        assert f"apfel-plus-{name}" in text, (
+            f"caveats should advertise apfel-plus-{name} so users can discover it"
         )
 
 
 def test_formula_brew_test_asserts_demo_symlink(tmp_path):
-    output = tmp_path / "apfel.rb"
+    output = tmp_path / "apfel-plus.rb"
     subprocess.run(
         [
             "bash",
@@ -127,7 +127,7 @@ def test_formula_brew_test_asserts_demo_symlink(tmp_path):
     test_block = re.search(r"test do\b(.*?)\bend\b", text, re.DOTALL)
     assert test_block, "formula must keep a `test do` block"
     body = test_block.group(1)
-    assert "apfel-cmd" in body, "brew test should assert apfel-cmd is installed"
+    assert "apfel-plus-cmd" in body, "brew test should assert apfel-plus-cmd is installed"
 
 
 def test_release_tarball_bundles_demos():
@@ -138,8 +138,8 @@ def test_release_tarball_bundles_demos():
     test run to trigger that. CI release flows always have them, so the
     assertion bites where it matters.
     """
-    binary = ROOT / ".build" / "release" / "apfel"
-    man = ROOT / ".build" / "release" / "apfel.1"
+    binary = ROOT / ".build" / "release" / "apfel-plus"
+    man = ROOT / ".build" / "release" / "apfel-plus.1"
     if not binary.exists() or not man.exists():
         pytest.skip(
             "Release build artefacts missing (run `make build && make generate-man-page`)"
@@ -152,15 +152,15 @@ def test_release_tarball_bundles_demos():
         capture_output=True,
     )
     version = (ROOT / ".version").read_text().strip()
-    asset = ROOT / f"apfel-{version}-arm64-macos.tar.gz"
+    asset = ROOT / f"apfel-plus-{version}-arm64-macos.tar.gz"
     assert asset.exists(), f"expected tarball at {asset}"
 
     result = subprocess.run(
         ["tar", "-tzf", str(asset)], capture_output=True, text=True, check=True
     )
     entries = result.stdout.splitlines()
-    assert "apfel" in entries, "tarball must contain the apfel binary"
-    assert "apfel.1" in entries, "tarball must contain the man page"
+    assert "apfel-plus" in entries, "tarball must contain the apfel-plus binary"
+    assert "apfel-plus.1" in entries, "tarball must contain the man page"
     for name in EXPECTED_DEMOS:
         assert f"demo/{name}" in entries, (
             f"tarball must bundle demo/{name} so brew users can install it"

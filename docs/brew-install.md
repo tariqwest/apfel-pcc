@@ -1,16 +1,16 @@
 # Install with Homebrew
 
-`apfel` is available in homebrew-core:
+`apfel-plus` is available in homebrew-core:
 
 ```bash
-brew install apfel
+brew install apfel-plus
 ```
 
 Verify the install:
 
 ```bash
-apfel --version
-apfel --release
+apfel-plus --version
+apfel-plus --release
 ```
 
 ## Requirements
@@ -19,20 +19,20 @@ apfel --release
 - macOS 26.4 or newer
 - Apple Intelligence enabled
 
-Homebrew installs the `apfel` binary. You do **not** need Xcode.
+Homebrew installs the `apfel-plus` binary. You do **not** need Xcode.
 
 ## Troubleshooting
 
 If the binary runs but generation is unavailable, check:
 
 ```bash
-apfel --model-info
+apfel-plus --model-info
 ```
 
-If you already installed `apfel` manually into `/usr/local/bin/apfel`, make sure the Homebrew binary is first in your `PATH`:
+If you already installed `apfel-plus` manually into `/usr/local/bin/apfel-plus`, make sure the Homebrew binary is first in your `PATH`:
 
 ```bash
-which apfel
+which apfel-plus
 brew --prefix
 ```
 

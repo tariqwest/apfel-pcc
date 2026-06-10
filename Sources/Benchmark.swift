@@ -1,6 +1,6 @@
 // ============================================================================
 // Benchmark.swift — Internal performance benchmarks
-// Part of apfel — Apple Intelligence from the command line
+// Part of apfel-plus — Apple Intelligence from the command line
 // ============================================================================
 
 import Foundation
@@ -42,7 +42,7 @@ func runBenchmarks() async throws {
         print(jsonString(report, pretty: false), terminator: "")
     case .plain:
         print("""
-        \(styled("apfel", .cyan, .bold)) v\(report.version) — benchmark report
+        \(styled("apfel-plus", .cyan, .bold)) v\(report.version) — benchmark report
         model: \(report.environment.model)
         context: \(report.environment.context_window) tokens
         token counter available: \(report.environment.token_counter_available)

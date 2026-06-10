@@ -1,14 +1,14 @@
 # How to use the Apple Foundation Model from Ruby
 
-Call Apple's on-device Foundation Model from Ruby using the `ruby-openai` gem, pointed at a local `apfel --serve`. 100% on-device, zero API cost.
+Call Apple's on-device Foundation Model from Ruby using the `ruby-openai` gem, pointed at a local `apfel-plus --serve`. 100% on-device, zero API cost.
 
 Runnable scripts + tests: [Arthur-Ficial/apfel-guides-lab/scripts/ruby](https://github.com/Arthur-Ficial/apfel-guides-lab/tree/main/scripts/ruby).
 
 ## Prerequisites
 
 - macOS 26+ Tahoe, Apple Silicon, Apple Intelligence enabled
-- `brew install apfel`
-- `apfel --serve` running (port `11434`)
+- `brew install apfel-plus`
+- `apfel-plus --serve` running (port `11434`)
 - Ruby 2.6+ (ships with macOS)
 - `gem install ruby-openai` (or `bundle add ruby-openai`)
 
@@ -123,7 +123,7 @@ require "openai"
 client = OpenAI::Client.new(uri_base: "http://localhost:11434", access_token: "not-needed")
 
 begin
-  client.embeddings(parameters: { model: "apple-foundationmodel", input: "apfel runs 100% on-device." })
+  client.embeddings(parameters: { model: "apple-foundationmodel", input: "apfel-plus runs 100% on-device." })
 rescue Faraday::Error => e
   status = e.response && e.response[:status]
   puts "Got expected error: HTTP #{status} - #{e.message}"
@@ -223,13 +223,13 @@ Lab script: [`06_example.rb`](https://github.com/Arthur-Ficial/apfel-guides-lab/
 
 ## Troubleshooting
 
-- **Connection refused** - start `apfel --serve` before running the Ruby script.
+- **Connection refused** - start `apfel-plus --serve` before running the Ruby script.
 - **`e.response[:status]`** - only present when Faraday raises with a full response object. For low-level socket errors it's nil.
 - **Rails** - these patterns drop into a Rails controller or background job without changes. Use the same `OpenAI::Client` pointed at localhost.
 
 ## Tested with
 
-- apfel v1.0.3 / macOS 26.3.1 Apple Silicon
+- apfel-plus v1.0.3 / macOS 26.3.1 Apple Silicon
 - Ruby 2.6.10 (system) / ruby-openai 7.4.0
 - Date: 2026-04-16
 

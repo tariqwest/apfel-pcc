@@ -1,20 +1,20 @@
-# apfel - Project Instructions
+# apfel-plus - Project Instructions
 
 **The free AI already on your Mac.** This is our claim. Every surface (README, landing page, repo description) must reinforce it. On-device is the default; Apple's Private Cloud Compute (still no API keys, still no third parties) is an explicit opt-in.
 
 ## The Golden Goal
 
-apfel exposes Apple's on-device FoundationModels LLM. **Two things are the product. Two things are byproducts.**
+apfel-plus exposes Apple's on-device FoundationModels LLM. **Two things are the product. Two things are byproducts.**
 
-### Core product (this is what apfel IS)
+### Core product (this is what apfel-plus IS)
 
-1. **UNIX tool** (`apfel "prompt"`, `echo "text" | apfel`, `apfel --stream`)
+1. **UNIX tool** (`apfel-plus "prompt"`, `echo "text" | apfel-plus`, `apfel-plus --stream`)
    - Pipe-friendly, composable, correct exit codes
    - Works with `jq`, `xargs`, shell scripts
    - `--json` output for machine consumption
    - Respects `NO_COLOR`, `--quiet`, stdin detection
 
-2. **OpenAI API-compatible HTTP server** (`apfel --serve`)
+2. **OpenAI API-compatible HTTP server** (`apfel-plus --serve`)
    - Drop-in replacement for `openai.OpenAI(base_url="http://localhost:11434/v1")`
    - `/v1/chat/completions` (streaming + non-streaming)
    - `/v1/models`, `/health`, tool calling, `response_format`
@@ -25,7 +25,7 @@ These two modes are what the README.md leads with. Every design decision, test, 
 
 ### Byproducts (useful, but not the pitch)
 
-3. **Interactive mini TUI chat** (`apfel --chat`) - **a byproduct for quick testing, not a main product.**
+3. **Interactive mini TUI chat** (`apfel-plus --chat`) - **a byproduct for quick testing, not a main product.**
    - Ships because the pieces are already there (Session, ContextManager, tool calling)
    - Handy for quick testing a prompt or a local MCP server without writing a client
    - Should not dominate README real-estate; a short Quick Start entry is enough
@@ -34,7 +34,7 @@ These two modes are what the README.md leads with. Every design decision, test, 
 4. **Swift library** (`import ApfelCore`, first shipped in `1.1.0`) - **a goal, but a secondary surface.**
    - Pure, FoundationModels-free Swift Package library product
    - OpenAI-compatible request/response types, validation, tool-call handling, schema parsing, MCP protocol, error classification, retry logic, context-trimming strategies
-   - Downstream apps call FoundationModels themselves - apfel just supplies the types and policies
+   - Downstream apps call FoundationModels themselves - apfel-plus just supplies the types and policies
    - DocC catalog at `Sources/Core/ApfelCore.docc/`, runnable examples at `Examples/`, stability contract in [STABILITY.md](STABILITY.md)
    - API-breakage guarded in CI via `swift package diagnose-api-breaking-changes`
    - **Must NOT be front-and-center in README.md.** One single link to [docs/swift-library.md](docs/swift-library.md) further down the page - no install snippet, no `import ApfelCore` sample, no types list. All Swift-library README content lives on dedicated docs pages.
@@ -47,9 +47,9 @@ The README.md mirrors this priority - **violating this structure is a bug.**
 
 - Hero + tagline: UNIX tool and OpenAI-compatible server only
 - "What it is" table: **two rows** (UNIX tool, OpenAI server). Nothing else.
-- Right after the table: a one-command "Try it right away: `apfel --chat`" pointer. Rationale: chat is not the main product, but it is the lowest-friction way for a new user to verify install and see apfel responding - so the try-it pointer belongs up top, next to the install block.
+- Right after the table: a one-command "Try it right away: `apfel-plus --chat`" pointer. Rationale: chat is not the main product, but it is the lowest-friction way for a new user to verify install and see apfel-plus responding - so the try-it pointer belongs up top, next to the install block.
 - Quick Start: UNIX tool first, server second, chat gets a short subsection covering flags and variants (MCP, system prompt, debug)
-- Swift library: **one link, one line**, in a later section (e.g. "Reference Docs" or near the `apfel tree`), pointing to [docs/swift-library.md](docs/swift-library.md). No code samples, no `Package.swift` snippets, no type catalogue in the README.
+- Swift library: **one link, one line**, in a later section (e.g. "Reference Docs" or near the `apfel-plus tree`), pointing to [docs/swift-library.md](docs/swift-library.md). No code samples, no `Package.swift` snippets, no type catalogue in the README.
 - All Swift-library detail (install snippet, import example, API surface summary, stability contract pointers, example catalogue) lives on `docs/swift-library.md` and the DocC catalog. Not in README.md.
 
 ### Non-negotiable principles:
@@ -64,7 +64,7 @@ The README.md mirrors this priority - **violating this structure is a bug.**
 ### Documentation style:
 
 - **Links in docs and README:** Always use the URL/path as the anchor text, not generic phrases like "full guide" or "click here". Example: `[docs/background-service.md](docs/background-service.md)` not `[full guide](docs/background-service.md)`.
-- **One code block, one purpose - never mix mutually-exclusive commands.** A fenced code block must be safe to copy-paste verbatim into a terminal: every line either runs in sequence as part of the same workflow, or the block contains only one command. Alternatives (e.g. `brew install apfel` vs `brew install Arthur-Ficial/tap/apfel` vs `git clone … && make install`) get **separate** fenced blocks with a one-line prose lead-in describing when to use that block. Inline `#` comments labelling alternatives inside one block are not a substitute - users hit "copy" and run the lot. This applies to README.md, every file under `docs/`, and any future user-facing surface.
+- **One code block, one purpose - never mix mutually-exclusive commands.** A fenced code block must be safe to copy-paste verbatim into a terminal: every line either runs in sequence as part of the same workflow, or the block contains only one command. Alternatives (e.g. `brew install apfel-plus` vs `brew install tariqwest/tap/apfel-plus` vs `git clone … && make install`) get **separate** fenced blocks with a one-line prose lead-in describing when to use that block. Inline `#` comments labelling alternatives inside one block are not a substitute - users hit "copy" and run the lot. This applies to README.md, every file under `docs/`, and any future user-facing surface.
 
 ## Architecture
 
@@ -79,14 +79,14 @@ HTTP Server (/v1/*) ───────┘   ContextManager → Transcript API
 
 - `ApfelCore` library: pure Swift, no FoundationModels dependency, unit-testable
 - Main target: FoundationModels integration, Hummingbird HTTP server
-- Tests: `swift run apfel-tests` (pure Swift runner, no XCTest needed)
+- Tests: `swift run apfel-plus-tests` (pure Swift runner, no XCTest needed)
 - No Xcode required - builds with Command Line Tools only
 
 ## Current Status
 
 - Version: `1.5.0` (source of truth: `.version`)
 - Tests: 650 unit + 273 integration
-- Distribution: homebrew-core (`brew install apfel`), nixpkgs (`nix profile install nixpkgs#apfel-llm`), and the Arthur-Ficial/homebrew-tap
+- Distribution: homebrew-core (`brew install apfel-plus`), nixpkgs (`nix profile install nixpkgs#apfel-plus-llm`), and the tariqwest/homebrew-tap
 - Stability policy: [STABILITY.md](STABILITY.md)
 - Security policy: [SECURITY.md](SECURITY.md)
 
@@ -98,13 +98,13 @@ make install                   # build release + install to /usr/local/bin (NO v
 make build                     # build release only (NO version bump)
 make version                   # print current version
 swift build                    # debug build
-swift run apfel-tests          # unit tests only (599 tests)
+swift run apfel-plus-tests          # unit tests only (599 tests)
 make preflight                 # full release qualification (unit + integration + policy checks)
 ```
 
 `make test` builds the release binary, runs all 599 unit tests, starts test servers, runs all 257 integration tests, and cleans up. This is the single command for development.
 
-`make install` auto-unlinks Homebrew apfel so the dev binary takes PATH priority. `make uninstall` restores the Homebrew link.
+`make install` auto-unlinks Homebrew apfel-plus so the dev binary takes PATH priority. `make uninstall` restores the Homebrew link.
 
 **Version is in `.version` file** (single source of truth). Local builds (`make build`, `make install`) do NOT change the version. Only the release workflow (`make release`) bumps versions. This ensures patch versions mean "published compatible fix", not "someone ran a build". **Never manually edit `.version`, `BuildInfo.swift`, or the README badge** - these are updated atomically by the release workflow.
 
@@ -131,7 +131,7 @@ bash scripts/generate-examples.sh          # ~2 minutes, overwrites docs/EXAMPLE
 | Security | `Sources/Core/OriginValidator.swift`, `Sources/SecurityMiddleware.swift` |
 | MCP client | `Sources/Core/MCPProtocol.swift`, `Sources/MCPClient.swift` |
 | MCP calculator | `mcp/calculator/server.py` |
-| Tests | `Tests/apfelTests/` (599 unit), `Tests/integration/` (257 integration) |
+| Tests | `Tests/apfelPlusTests/` (599 unit), `Tests/integration/` (257 integration) |
 
 | Docs | `docs/` (brew-install, EXAMPLES, release, tool-calling-guide) |
 | Scripts | `scripts/generate-examples.sh`, `scripts/write-homebrew-formula.sh`, `scripts/release-preflight.sh`, `scripts/post-release-verify.sh` |
@@ -140,7 +140,7 @@ bash scripts/generate-examples.sh          # ~2 minutes, overwrites docs/EXAMPLE
 
 When a new issue comes in, follow this process:
 
-1. **Fetch** the full issue with `gh issue view <n> --repo Arthur-Ficial/apfel --json body,comments,title,author,labels`
+1. **Fetch** the full issue with `gh issue view <n> --repo tariqwest/apfel-plus --json body,comments,title,author,labels`
 2. **Vet** - is it a real bug, valid feature request, or noise?
    - Does it align with the golden goal and non-negotiable principles?
    - Can you reproduce it?
@@ -149,32 +149,32 @@ When a new issue comes in, follow this process:
 3. **Fix** if valid:
    - Write tests first (TDD) for bugs
    - Keep changes minimal and KISS
-   - `make install` + run all tests (`swift run apfel-tests` + `python3 -m pytest Tests/integration/ -v`)
+   - `make install` + run all tests (`swift run apfel-plus-tests` + `python3 -m pytest Tests/integration/ -v`)
 4. **Release** if code changed - see "Publishing a Release" below
 5. **Close** the issue with a friendly, short, truthful comment:
    - What was the problem
    - What was fixed (or why it was closed without a fix)
-   - How to update (`brew upgrade apfel`)
-6. **Landing page** (apfel.franzai.com) is a separate Cloudflare Pages project, not in this repo
+   - How to update (`brew upgrade apfel-plus`)
+6. **Landing page** (apfel-plus.franzai.com) is a separate Cloudflare Pages project, not in this repo
 
 ## Handling Pull Requests
 
 When a PR is opened, follow this process. Scale the rigor to the PR type - docs-only PRs skip the security audit and test coverage steps, code PRs get the full treatment.
 
-**Automated first-responder:** `Arthur-Ficial/apfel` has a Claude Code routine (`.claude/routines/02-pr-auto-review.md`) that runs this entire process on `pull_request.opened` / `pull_request.synchronize` and posts a `COMMENTED` review. The routine cannot `--approve`, cannot merge, cannot run `make test` (no Apple Intelligence on cloud runners), and cannot cut releases. It is a first-pass safety net, not a replacement for human judgement. Franz still merges, Franz still releases - always. See [docs/routines.md](docs/routines.md) and [.claude/routines/README.md](.claude/routines/README.md).
+**Automated first-responder:** `tariqwest/apfel-plus` has a Claude Code routine (`.claude/routines/02-pr-auto-review.md`) that runs this entire process on `pull_request.opened` / `pull_request.synchronize` and posts a `COMMENTED` review. The routine cannot `--approve`, cannot merge, cannot run `make test` (no Apple Intelligence on cloud runners), and cannot cut releases. It is a first-pass safety net, not a replacement for human judgement. Franz still merges, Franz still releases - always. See [docs/routines.md](docs/routines.md) and [.claude/routines/README.md](.claude/routines/README.md).
 
 ### 1. Fetch everything
 
 ```bash
-gh pr view <n> --repo Arthur-Ficial/apfel --json title,author,body,state,mergeable,mergeStateStatus,reviews,comments,commits,statusCheckRollup,files,headRefName,headRepositoryOwner
-gh pr diff <n> --repo Arthur-Ficial/apfel                             # full diff
-gh api repos/Arthur-Ficial/apfel/pulls/<n>/comments                   # inline review comments
+gh pr view <n> --repo tariqwest/apfel-plus --json title,author,body,state,mergeable,mergeStateStatus,reviews,comments,commits,statusCheckRollup,files,headRefName,headRepositoryOwner
+gh pr diff <n> --repo tariqwest/apfel-plus                             # full diff
+gh api repos/tariqwest/apfel-plus/pulls/<n>/comments                   # inline review comments
 git fetch origin pull/<n>/head:pr-<n>-head && git checkout pr-<n>-head # actual tree
 ```
 
 ### 2. Vet the author
 
-- First-time contributor to apfel? (`gh pr list --repo Arthur-Ficial/apfel --state all --author <login>`)
+- First-time contributor to apfel-plus? (`gh pr list --repo tariqwest/apfel-plus --state all --author <login>`)
 - Legitimate GitHub profile? Check `gh api users/<login>` for public_repos, followers, blog, creation date
 - Commit author email matches the GitHub account (spot typo-squatting)
 - Any red flags in prior public work
@@ -214,14 +214,14 @@ Priority-rank findings:
 
 - Does it fit the golden goal (UNIX tool + OpenAI server + chat)?
 - Does it respect the non-negotiable principles (100% on-device, honest limits, clean code, Swift 6 strict concurrency, usable security)?
-- Does it introduce cross-target dependencies that violate the `ApfelCore` (pure) / `ApfelCLI` (CLI types) / `apfel` (FoundationModels + Hummingbird) layering?
+- Does it introduce cross-target dependencies that violate the `ApfelCore` (pure) / `ApfelCLI` (CLI types) / `apfel-plus` (FoundationModels + Hummingbird) layering?
 - Are the existing patterns followed (test harness, error types, context strategy, retry)?
-- **Tool-calling boundary (parked architectural ticket #119):** apfel's tool execution is out-of-band - the model emits a tool-call request in its output text, apfel parses it via `ToolCallHandler.detectToolCall`, runs the tool via `MCPClient`, and feeds the result back. FoundationModels' native `Tool` protocol and in-band invocation are not used, so `FoundationModels.LanguageModelSession.ToolCallError` is unreachable and `ApfelError.classify(_:)` deliberately has no branch for it (see `Sources/Core/ApfelError.swift:23`). If a PR adds `LanguageModelSession(..., tools: [SomeTool()])`, defines a type conforming to `FoundationModels.Tool` inside apfel, or otherwise registers a live tool implementation with the framework, it MUST also add the companion `ApfelError` classifier branch and an integration test that exercises the throw path end-to-end. Reopen #119 with the PR.
+- **Tool-calling boundary (parked architectural ticket #119):** apfel-plus's tool execution is out-of-band - the model emits a tool-call request in its output text, apfel-plus parses it via `ToolCallHandler.detectToolCall`, runs the tool via `MCPClient`, and feeds the result back. FoundationModels' native `Tool` protocol and in-band invocation are not used, so `FoundationModels.LanguageModelSession.ToolCallError` is unreachable and `ApfelError.classify(_:)` deliberately has no branch for it (see `Sources/Core/ApfelError.swift:23`). If a PR adds `LanguageModelSession(..., tools: [SomeTool()])`, defines a type conforming to `FoundationModels.Tool` inside apfel-plus, or otherwise registers a live tool implementation with the framework, it MUST also add the companion `ApfelError` classifier branch and an integration test that exercises the throw path end-to-end. Reopen #119 with the PR.
 
 ### 7. Test coverage check (code PRs)
 
-- New flag? Must have happy-path + every validation error test in `Tests/apfelTests/CLIArgumentsTests.swift`
-- New public API on a pure `ApfelCore` type? Unit test in the corresponding `Tests/apfelTests/*Tests.swift`
+- New flag? Must have happy-path + every validation error test in `Tests/apfelPlusTests/CLIArgumentsTests.swift`
+- New public API on a pure `ApfelCore` type? Unit test in the corresponding `Tests/apfelPlusTests/*Tests.swift`
 - New network or subprocess surface? Integration test wired into `Tests/integration/` using the existing conftest pattern - **standalone manual scripts in `mcp/`, `scripts/`, etc. do not count**
 - Error tests must use the tightened style: `catch let e as CLIParseError { assertTrue(e.message.contains("...")) }` - not just `threw = true`
 
@@ -230,23 +230,23 @@ Priority-rank findings:
 ```bash
 git checkout pr-<n>-head
 swift build                                              # must be clean, no warnings
-swift run apfel-tests                                    # existing unit tests must still pass
+swift run apfel-plus-tests                                    # existing unit tests must still pass
 # For code PRs, also:
-make install && apfel --serve --port 11434 &
-apfel --serve --port 11435 --mcp mcp/calculator/server.py &
+make install && apfel-plus --serve --port 11434 &
+apfel-plus --serve --port 11435 --mcp mcp/calculator/server.py &
 sleep 4
 python3 -m pytest Tests/integration/ -v                  # must pass, 0 skipped
-pkill -f "apfel --serve"
+pkill -f "apfel-plus --serve"
 ```
 
 ### 9. Verify CI on the PR
 
-- `gh pr view <n> --repo Arthur-Ficial/apfel --json statusCheckRollup`
+- `gh pr view <n> --repo tariqwest/apfel-plus --json statusCheckRollup`
 - First-time contributors trigger `action_required` on Actions - the CI run needs manual approval before it executes. Approve it before reviewing so the PR has real CI results to reference.
 
 ### 10. Review
 
-Post a structured review via `gh pr review <n> --repo Arthur-Ficial/apfel --request-changes|--approve|--comment --body "..."`:
+Post a structured review via `gh pr review <n> --repo tariqwest/apfel-plus --request-changes|--approve|--comment --body "..."`:
 
 - **Open with genuine praise** for what works. Reviews that lead with negatives make contributors defensive.
 - **Summary table** of findings (P0/P1/P2, severity, area, one-line summary)
@@ -325,12 +325,12 @@ Verifies: GitHub Release exists with tarball, git tag exists, `.version` matches
 
 ### Distribution channels
 
-apfel ships through three channels. All pull the same signed tarball from each GitHub Release.
+apfel-plus ships through three channels. All pull the same signed tarball from each GitHub Release.
 
-- **homebrew-core** - `brew install apfel`. Autobump detects new releases; latency ~24h. We do not maintain the formula.
-- **Arthur-Ficial/homebrew-tap** - `brew install Arthur-Ficial/tap/apfel`. Synchronous, pushed as part of `make release`. Secondary channel; also houses apfel-family tools (apfel-chat, apfel-clip, apfel-mcp, etc.).
-- **nixpkgs** - `nix profile install nixpkgs#apfel-llm`. Name is `apfel-llm` because nixpkgs already has an unrelated physics `apfel` package and the disambiguator landed upstream as `apfel-llm` (PR NixOS/nixpkgs#508084). Bumps fire automatically as the final non-fatal step of `make release` via `scripts/publish-nixpkgs-bump.sh` (forks `NixOS/nixpkgs` once, syncs from upstream, opens a PR via the local `gh` session - no stored PAT). The `r-ryantm` bot is the safety net if the local bump is skipped. See [docs/nixpkgs.md](docs/nixpkgs.md).
-- Emergency Homebrew bump: `brew bump-formula-pr apfel --url=<tarball-url> --sha256=<hash>`
+- **homebrew-core** - `brew install apfel-plus`. Autobump detects new releases; latency ~24h. We do not maintain the formula.
+- **tariqwest/homebrew-tap** - `brew install tariqwest/tap/apfel-plus`. Synchronous, pushed as part of `make release`. Secondary channel; also houses apfel-plus-family tools (apfel-chat, apfel-clip, apfel-plus-mcp, etc.).
+- **nixpkgs** - `nix profile install nixpkgs#apfel-plus-llm`. Name is `apfel-plus-llm` because nixpkgs already has an unrelated physics `apfel-plus` package and the disambiguator landed upstream as `apfel-plus-llm` (PR NixOS/nixpkgs#508084). Bumps fire automatically as the final non-fatal step of `make release` via `scripts/publish-nixpkgs-bump.sh` (forks `NixOS/nixpkgs` once, syncs from upstream, opens a PR via the local `gh` session - no stored PAT). The `r-ryantm` bot is the safety net if the local bump is skipped. See [docs/nixpkgs.md](docs/nixpkgs.md).
+- Emergency Homebrew bump: `brew bump-formula-pr apfel-plus --url=<tarball-url> --sha256=<hash>`
 - Standalone nixpkgs bump (e.g. catch-up if a release skipped it): `./scripts/publish-nixpkgs-bump.sh --version X.Y.Z`. Manual recovery in [docs/nixpkgs.md](docs/nixpkgs.md) "Manual self-bump".
 
 ### Do NOT manually

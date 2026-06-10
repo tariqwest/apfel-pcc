@@ -1,22 +1,22 @@
 # How to use the Apple Foundation Model from Python
 
-Call Apple's on-device Foundation Model from Python using the official `openai` SDK, pointed at a local `apfel --serve`. 100% on-device, zero API cost, no network required for inference.
+Call Apple's on-device Foundation Model from Python using the official `openai` SDK, pointed at a local `apfel-plus --serve`. 100% on-device, zero API cost, no network required for inference.
 
-This guide shows the canonical patterns: one-shot completion, streaming, JSON mode, error handling, tool calling, and a real text-summarization example. Every code block was run against a live apfel server; the output below each snippet is the real unedited stdout.
+This guide shows the canonical patterns: one-shot completion, streaming, JSON mode, error handling, tool calling, and a real text-summarization example. Every code block was run against a live apfel-plus server; the output below each snippet is the real unedited stdout.
 
 Runnable scripts + tests: [Arthur-Ficial/apfel-guides-lab/scripts/python](https://github.com/Arthur-Ficial/apfel-guides-lab/tree/main/scripts/python).
 
 ## Prerequisites
 
 - macOS 26+ Tahoe, Apple Silicon, Apple Intelligence enabled
-- `brew install apfel`
-- `apfel --serve` running (default port `11434`)
+- `brew install apfel-plus`
+- `apfel-plus --serve` running (default port `11434`)
 - Python 3.11+
 - `pip install openai` (or `uv add openai`)
 
 ## 1. One-shot chat completion
 
-Point the `openai` SDK at your local apfel server and call `chat.completions.create`:
+Point the `openai` SDK at your local apfel-plus server and call `chat.completions.create`:
 
 ```python
 from openai import OpenAI
@@ -80,7 +80,7 @@ Lab script: [`02_stream.py`](https://github.com/Arthur-Ficial/apfel-guides-lab/b
 
 ## 3. JSON mode / structured output
 
-Request `response_format: {"type": "json_object"}` and parse. apfel may wrap output in markdown fences - the fence-strip regex below handles both cases cleanly:
+Request `response_format: {"type": "json_object"}` and parse. apfel-plus may wrap output in markdown fences - the fence-strip regex below handles both cases cleanly:
 
 ```python
 import json, re
@@ -118,7 +118,7 @@ Lab script: [`03_json.py`](https://github.com/Arthur-Ficial/apfel-guides-lab/blo
 
 ## 4. Error handling
 
-apfel returns honest HTTP errors for unsupported features. Embeddings return `501`:
+apfel-plus returns honest HTTP errors for unsupported features. Embeddings return `501`:
 
 ```python
 from openai import APIStatusError, OpenAI
@@ -128,7 +128,7 @@ client = OpenAI(base_url="http://localhost:11434/v1", api_key="not-needed")
 try:
     client.embeddings.create(
         model="apple-foundationmodel",
-        input="apfel runs 100% on-device.",
+        input="apfel-plus runs 100% on-device.",
     )
 except APIStatusError as e:
     print(f"Got expected error: HTTP {e.status_code} - {e.message}")
@@ -237,15 +237,15 @@ Lab script: [`06_example.py`](https://github.com/Arthur-Ficial/apfel-guides-lab/
 
 ## Troubleshooting
 
-- **`Connection refused` on port 11434** - run `apfel --serve` first.
-- **`Embeddings not supported`** - apfel is text-only; use sentence-transformers or another embedder for vectors.
-- **`JSONDecodeError` in JSON mode** - keep the fence-strip regex; apfel sometimes wraps JSON in `` ```json ... ``` ``.
+- **`Connection refused` on port 11434** - run `apfel-plus --serve` first.
+- **`Embeddings not supported`** - apfel-plus is text-only; use sentence-transformers or another embedder for vectors.
+- **`JSONDecodeError` in JSON mode** - keep the fence-strip regex; apfel-plus sometimes wraps JSON in `` ```json ... ``` ``.
 - **Empty streaming output** - make sure your client handles the final `usage` chunk with empty `choices`. The `if not chunk.choices: continue` above covers it.
 - **Model refuses a tool call** - small on-device models occasionally decline. Retry the whole call.
 
 ## Tested with
 
-- apfel v1.0.3
+- apfel-plus v1.0.3
 - macOS 26.3.1, Apple Silicon
 - Python 3.11 / openai 2.31.0
 - Date: 2026-04-16

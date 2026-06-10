@@ -1,7 +1,7 @@
 """
-apfel Integration Tests - scripts/bump-nixpkgs.sh.
+apfel-plus Integration Tests - scripts/bump-nixpkgs.sh.
 
-The bump-nixpkgs.sh script is a pure shell tool that updates apfel-llm's
+The bump-nixpkgs.sh script is a pure shell tool that updates apfel-plus-llm's
 package.nix in a nixpkgs checkout. It must:
   - rewrite version and hash exactly once each
   - compute a correct SRI sha256 from a local tarball
@@ -31,11 +31,11 @@ PACKAGE_TEMPLATE = """{
 }:
 
 stdenv.mkDerivation (finalAttrs: {
-  pname = "apfel-llm";
+  pname = "apfel-plus-llm";
   version = "1.0.5";
 
   src = fetchurl {
-    url = "https://example.com/apfel-${finalAttrs.version}.tar.gz";
+    url = "https://example.com/apfel-plus-${finalAttrs.version}.tar.gz";
     hash = "sha256-etEOYkYVPm08SRE3nuKcDigS7lCkUUgMacOl/sLv/1A=";
   };
 
@@ -70,7 +70,7 @@ def workspace(tmp_path):
     pkg = tmp_path / "package.nix"
     pkg.write_text(PACKAGE_TEMPLATE)
 
-    tarball = tmp_path / "apfel-1.3.3-arm64-macos.tar.gz"
+    tarball = tmp_path / "apfel-plus-1.3.3-arm64-macos.tar.gz"
     tarball.write_bytes(b"deterministic-fake-tarball-bytes-for-test\n")
 
     return pkg, tarball

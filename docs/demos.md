@@ -1,6 +1,6 @@
 # Demos
 
-`apfel` ships with real shell wrappers in `demo/`. This page keeps the longer walkthroughs that used to live in `README.md`; the quicker per-script overview stays in [../demo/README.md](../demo/README.md).
+`apfel-plus` ships with real shell wrappers in `demo/`. This page keeps the longer walkthroughs that used to live in `README.md`; the quicker per-script overview stays in [../demo/README.md](../demo/README.md).
 
 ## [../demo/cmd](../demo/cmd)
 
@@ -19,8 +19,8 @@ demo/cmd -c "list open ports"                  # -c = copy to clipboard
 Add this to your `.zshrc` and use `cmd` from anywhere:
 
 ```bash
-# cmd - natural language to shell command (apfel). Add to .zshrc:
-cmd(){ local x c r a; while [[ $1 == -* ]]; do case $1 in -x)x=1;shift;; -c)c=1;shift;; *)break;; esac; done; r=$(apfel -q -s 'Output only a shell command.' "$*" | sed '/^```/d;/^#/d;s/\x1b\[[0-9;]*[a-zA-Z]//g;s/^[[:space:]]*//;/^$/d' | head -1); [[ $r ]] || { echo "no command generated"; return 1; }; printf '\e[32m$\e[0m %s\n' "$r"; [[ $c ]] && printf %s "$r" | pbcopy && echo "(copied)"; [[ $x ]] && { printf 'Run? [y/N] '; read -r a; [[ $a == y ]] && eval "$r"; }; return 0; }
+# cmd - natural language to shell command (apfel-plus). Add to .zshrc:
+cmd(){ local x c r a; while [[ $1 == -* ]]; do case $1 in -x)x=1;shift;; -c)c=1;shift;; *)break;; esac; done; r=$(apfel-plus -q -s 'Output only a shell command.' "$*" | sed '/^```/d;/^#/d;s/\x1b\[[0-9;]*[a-zA-Z]//g;s/^[[:space:]]*//;/^$/d' | head -1); [[ $r ]] || { echo "no command generated"; return 1; }; printf '\e[32m$\e[0m %s\n' "$r"; [[ $c ]] && printf %s "$r" | pbcopy && echo "(copied)"; [[ $x ]] && { printf 'Run? [y/N] '; read -r a; [[ $a == y ]] && eval "$r"; }; return 0; }
 ```
 
 ```bash

@@ -1,12 +1,12 @@
 """
-apfel Integration Tests -- Remote MCP server (Streamable HTTP transport)
+apfel-plus Integration Tests -- Remote MCP server (Streamable HTTP transport)
 
 Tests: tool auto-execution, correct results, bearer auth, auth failure,
 startup error cases, SSE streaming, and mixed local+remote MCP.
 
 Run: python3 -m pytest Tests/integration/mcp_remote_test.py -v
 Requires: pip install pytest httpx
-Requires: swift build -c release (BINARY = .build/release/apfel)
+Requires: swift build -c release (BINARY = .build/release/apfel-plus)
 """
 
 import contextlib
@@ -21,7 +21,7 @@ import httpx
 import pytest
 
 ROOT = pathlib.Path(__file__).resolve().parents[2]
-BINARY = ROOT / ".build" / "release" / "apfel"
+BINARY = ROOT / ".build" / "release" / "apfel-plus"
 HTTP_MCP_SERVER = ROOT / "mcp" / "http-test-server" / "server.py"
 STDIO_MCP_SERVER = ROOT / "mcp" / "calculator" / "server.py"
 
@@ -78,7 +78,7 @@ def _wait_for_port(port, timeout=10):
 
 
 # ============================================================================
-# Fixtures: HTTP MCP server (no auth) + apfel
+# Fixtures: HTTP MCP server (no auth) + apfel-plus
 # ============================================================================
 
 
@@ -86,7 +86,7 @@ def _wait_for_port(port, timeout=10):
 def http_mcp_port():
     """Start the HTTP calculator MCP server (no auth) on a random port."""
     if not BINARY.exists():
-        pytest.skip(f"apfel binary not found at {BINARY}")
+        pytest.skip(f"apfel-plus binary not found at {BINARY}")
     if not HTTP_MCP_SERVER.exists():
         pytest.skip(f"HTTP MCP server not found at {HTTP_MCP_SERVER}")
     port = find_free_port()
@@ -105,7 +105,7 @@ def http_mcp_port():
 
 @pytest.fixture(scope="module")
 def apfel_remote_mcp_url(http_mcp_port):
-    """apfel --serve pointed at HTTP MCP (no auth)."""
+    """apfel-plus --serve pointed at HTTP MCP (no auth)."""
     apfel_port = find_free_port()
     mcp_url = f"http://127.0.0.1:{http_mcp_port}/mcp"
     with _popen(
@@ -121,7 +121,7 @@ def apfel_remote_mcp_url(http_mcp_port):
         if not wait_for_http(
             f"http://127.0.0.1:{apfel_port}/health", timeout=20
         ):
-            pytest.skip("apfel with remote MCP did not become healthy")
+            pytest.skip("apfel-plus with remote MCP did not become healthy")
         yield f"http://127.0.0.1:{apfel_port}/v1"
 
 
@@ -193,7 +193,7 @@ def auth_mcp_port():
 
 @pytest.fixture(scope="module")
 def apfel_auth_mcp_url(auth_mcp_port):
-    """apfel --serve with auth-required MCP and correct token."""
+    """apfel-plus --serve with auth-required MCP and correct token."""
     apfel_port = find_free_port()
     mcp_url = f"http://127.0.0.1:{auth_mcp_port}/mcp"
     with _popen(
@@ -211,7 +211,7 @@ def apfel_auth_mcp_url(auth_mcp_port):
         if not wait_for_http(
             f"http://127.0.0.1:{apfel_port}/health", timeout=20
         ):
-            pytest.skip("apfel with auth MCP did not become healthy")
+            pytest.skip("apfel-plus with auth MCP did not become healthy")
         yield f"http://127.0.0.1:{apfel_port}/v1"
 
 
@@ -222,7 +222,7 @@ def apfel_auth_mcp_url(auth_mcp_port):
 
 @pytest.fixture(scope="module")
 def apfel_mixed_mcp_url(http_mcp_port):
-    """apfel --serve with both local stdio calculator and remote HTTP calculator."""
+    """apfel-plus --serve with both local stdio calculator and remote HTTP calculator."""
     if not STDIO_MCP_SERVER.exists():
         pytest.skip(f"Stdio MCP server not found at {STDIO_MCP_SERVER}")
     apfel_port = find_free_port()
@@ -242,7 +242,7 @@ def apfel_mixed_mcp_url(http_mcp_port):
         if not wait_for_http(
             f"http://127.0.0.1:{apfel_port}/health", timeout=25
         ):
-            pytest.skip("apfel with mixed MCP did not become healthy")
+            pytest.skip("apfel-plus with mixed MCP did not become healthy")
         yield f"http://127.0.0.1:{apfel_port}/v1"
 
 
@@ -269,7 +269,7 @@ def test_remote_mcp_models_endpoint(apfel_remote_mcp_url):
 
 
 def test_remote_mcp_multiply_finish_reason(remote_multiply_response):
-    """finish_reason must be 'stop' - proves apfel ran the remote tool, not leaked it."""
+    """finish_reason must be 'stop' - proves apfel-plus ran the remote tool, not leaked it."""
     choice = remote_multiply_response["choices"][0]
     assert choice["finish_reason"] == "stop", (
         f"Got '{choice['finish_reason']}' - tool may not have executed"
@@ -365,7 +365,7 @@ def test_remote_mcp_streaming_tool_auto_execute(apfel_remote_mcp_url):
 
 
 def test_auth_mcp_apfel_healthy(apfel_auth_mcp_url):
-    """apfel starts successfully with auth-required remote MCP + correct token."""
+    """apfel-plus starts successfully with auth-required remote MCP + correct token."""
     base = apfel_auth_mcp_url.rsplit("/v1", 1)[0]
     resp = httpx.get(f"{base}/health", timeout=10)
     assert resp.status_code == 200
@@ -399,7 +399,7 @@ def test_auth_mcp_tool_executes_correctly(apfel_auth_mcp_url):
 
 
 def test_wrong_token_causes_startup_failure(auth_mcp_port):
-    """apfel must exit non-zero at startup if bearer token is wrong (server returns 401)."""
+    """apfel-plus must exit non-zero at startup if bearer token is wrong (server returns 401)."""
     mcp_url = f"http://127.0.0.1:{auth_mcp_port}/mcp"
     result = subprocess.run(
         [
@@ -425,7 +425,7 @@ def test_wrong_token_causes_startup_failure(auth_mcp_port):
 
 
 def test_missing_token_against_auth_required_server_fails(auth_mcp_port):
-    """apfel must exit non-zero if MCP server requires a token and none is provided."""
+    """apfel-plus must exit non-zero if MCP server requires a token and none is provided."""
     mcp_url = f"http://127.0.0.1:{auth_mcp_port}/mcp"
     result = subprocess.run(
         [
@@ -445,7 +445,7 @@ def test_missing_token_against_auth_required_server_fails(auth_mcp_port):
 
 
 def test_http_with_bearer_token_is_refused():
-    """apfel must refuse non-loopback http:// + --mcp-token (token would be sent in plaintext)."""
+    """apfel-plus must refuse non-loopback http:// + --mcp-token (token would be sent in plaintext)."""
     # 192.0.2.1 is TEST-NET (RFC 5737) - non-routable, non-loopback, guaranteed to be refused.
     # The security check fires before any network call, so this exits immediately.
     result = subprocess.run(
@@ -473,7 +473,7 @@ def test_http_with_bearer_token_is_refused():
 
 
 def test_unreachable_mcp_url_fails_gracefully():
-    """apfel must exit non-zero (not hang) when remote MCP URL is unreachable."""
+    """apfel-plus must exit non-zero (not hang) when remote MCP URL is unreachable."""
     result = subprocess.run(
         [
             str(BINARY),
@@ -497,7 +497,7 @@ def test_unreachable_mcp_url_fails_gracefully():
 
 
 def test_mixed_mcp_apfel_healthy(apfel_mixed_mcp_url):
-    """apfel starts with both local stdio and remote HTTP MCP servers."""
+    """apfel-plus starts with both local stdio and remote HTTP MCP servers."""
     base = apfel_mixed_mcp_url.rsplit("/v1", 1)[0]
     resp = httpx.get(f"{base}/health", timeout=10)
     assert resp.status_code == 200

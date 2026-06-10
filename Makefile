@@ -1,5 +1,5 @@
 PREFIX ?= /usr/local
-BINARY = apfel
+BINARY = apfel-plus
 VERSION_FILE = .version
 
 .PHONY: check-toolchain build install uninstall clean bump-patch bump-minor bump-major generate-build-info generate-man-page man update-readme version release release-patch release-minor release-major package-release-asset print-release-asset print-release-sha256 update-homebrew-formula preflight benchmark test
@@ -12,7 +12,7 @@ check-toolchain:
 	os_ver=$$(sw_vers -productVersion 2>/dev/null || echo "unknown"); \
 	if [ "$$sdk" = "missing" ]; then \
 		echo ""; \
-		echo "error: apfel could not determine your active Apple SDK version."; \
+		echo "error: apfel-plus could not determine your active Apple SDK version."; \
 		echo "Selected developer dir: $$devdir"; \
 		echo "Install or update Command Line Tools, then retry."; \
 		echo ""; \
@@ -27,7 +27,7 @@ check-toolchain:
 	if [ -z "$$minor" ]; then minor=0; fi; \
 	if [ "$$major" -lt 26 ] || { [ "$$major" -eq 26 ] && [ "$$minor" -lt 4 ]; }; then \
 		echo ""; \
-		echo "error: apfel requires Apple developer tools with the macOS 26.4 SDK or newer."; \
+		echo "error: apfel-plus requires Apple developer tools with the macOS 26.4 SDK or newer."; \
 		echo "Your macOS version: $$os_ver"; \
 		echo "Active SDK version: $$sdk"; \
 		echo "Selected developer dir: $$devdir"; \
@@ -51,16 +51,16 @@ build: check-toolchain
 	@$(MAKE) --no-print-directory generate-man-page
 
 install: build
-	@pkill -f "apfel --serve" 2>/dev/null || true
+	@pkill -f "apfel-plus --serve" 2>/dev/null || true
 	@sleep 1
-	@# If Homebrew apfel is linked and would shadow our install, unlink it.
+	@# If Homebrew apfel-plus is linked and would shadow our install, unlink it.
 	@# This only removes the symlink — the Homebrew package stays installed.
-	@# `brew upgrade apfel` or `brew link apfel` restores it.
-	@if command -v brew >/dev/null 2>&1 && brew list apfel >/dev/null 2>&1; then \
+	@# `brew upgrade apfel-plus` or `brew link apfel-plus` restores it.
+	@if command -v brew >/dev/null 2>&1 && brew list apfel-plus >/dev/null 2>&1; then \
 		brew_path=$$(brew --prefix)/bin/$(BINARY); \
 		if [ -L "$$brew_path" ]; then \
-			echo "unlinking Homebrew apfel (dev build takes priority)..."; \
-			brew unlink apfel 2>/dev/null || true; \
+			echo "unlinking Homebrew apfel-plus (dev build takes priority)..."; \
+			brew unlink apfel-plus 2>/dev/null || true; \
 		fi; \
 	fi
 	@if [ ! -d "$(PREFIX)/bin" ]; then \
@@ -93,7 +93,7 @@ install: build
 	@resolved=$$(which $(BINARY) 2>/dev/null || echo "not in PATH"); \
 	if [ "$$resolved" != "$(PREFIX)/bin/$(BINARY)" ]; then \
 		echo "⚠ warning: 'which $(BINARY)' resolves to $$resolved, not $(PREFIX)/bin/$(BINARY)"; \
-		echo "  Run: brew unlink apfel   (then make install again)"; \
+		echo "  Run: brew unlink apfel-plus   (then make install again)"; \
 	fi
 
 # --- Version bumps ---
@@ -166,21 +166,21 @@ update-readme:
 
 generate-man-page:
 	@v=$$(cat $(VERSION_FILE)); \
-	if [ ! -f man/apfel.1.in ]; then \
-		echo "error: missing man/apfel.1.in"; exit 1; \
+	if [ ! -f man/apfel-plus.1.in ]; then \
+		echo "error: missing man/apfel-plus.1.in"; exit 1; \
 	fi; \
 	mkdir -p .build/release; \
-	sed "s/@VERSION@/$$v/g" man/apfel.1.in > .build/release/apfel.1; \
+	sed "s/@VERSION@/$$v/g" man/apfel-plus.1.in > .build/release/apfel-plus.1; \
 	if command -v mandoc >/dev/null 2>&1; then \
-		if ! mandoc -Tlint -W warning .build/release/apfel.1 >/dev/null 2>&1; then \
-			echo "error: mandoc -Tlint failed on .build/release/apfel.1"; \
-			mandoc -Tlint -W warning .build/release/apfel.1; \
+		if ! mandoc -Tlint -W warning .build/release/apfel-plus.1 >/dev/null 2>&1; then \
+			echo "error: mandoc -Tlint failed on .build/release/apfel-plus.1"; \
+			mandoc -Tlint -W warning .build/release/apfel-plus.1; \
 			exit 1; \
 		fi; \
 	fi
 
 man: generate-man-page
-	@man .build/release/apfel.1
+	@man .build/release/apfel-plus.1
 
 # --- One-command release (runs locally with full test qualification) ---
 # GitHub-hosted runners lack Apple Intelligence, so releases run locally.
@@ -197,13 +197,13 @@ release:
 test: build
 	@echo ""
 	@echo "=== Unit tests ==="
-	@swift run apfel-tests
+	@swift run apfel-plus-tests
 	@echo ""
 	@echo "=== Integration tests ==="
-	@pkill -f "apfel --serve" 2>/dev/null || true
+	@pkill -f "apfel-plus --serve" 2>/dev/null || true
 	@sleep 1
-	@.build/release/apfel --serve --port 11434 2>/dev/null & echo $$! > /tmp/apfel-test-server.pid; \
-	.build/release/apfel --serve --port 11435 --mcp mcp/calculator/server.py 2>/dev/null & echo $$! > /tmp/apfel-test-mcp.pid; \
+	@.build/release/apfel-plus --serve --port 11434 2>/dev/null & echo $$! > /tmp/apfel-plus-test-server.pid; \
+	.build/release/apfel-plus --serve --port 11435 --mcp mcp/calculator/server.py 2>/dev/null & echo $$! > /tmp/apfel-plus-test-mcp.pid; \
 	READY=0; for i in $$(seq 1 15); do \
 		curl -sf http://localhost:11434/health >/dev/null 2>&1 && \
 		curl -sf http://localhost:11435/health >/dev/null 2>&1 && \
@@ -211,8 +211,8 @@ test: build
 	if [ "$$READY" -ne 1 ]; then echo "FATAL: servers did not start"; exit 1; fi; \
 	python3 -m pytest Tests/integration/ -v --tb=short; \
 	STATUS=$$?; \
-	kill $$(cat /tmp/apfel-test-server.pid) $$(cat /tmp/apfel-test-mcp.pid) 2>/dev/null || true; \
-	rm -f /tmp/apfel-test-server.pid /tmp/apfel-test-mcp.pid; \
+	kill $$(cat /tmp/apfel-plus-test-server.pid) $$(cat /tmp/apfel-plus-test-mcp.pid) 2>/dev/null || true; \
+	rm -f /tmp/apfel-plus-test-server.pid /tmp/apfel-plus-test-mcp.pid; \
 	exit $$STATUS
 
 # --- Pre-release qualification ---
@@ -239,11 +239,11 @@ uninstall:
 			sudo rm -f "$$man_file"; \
 		fi; \
 	fi
-	@# Restore Homebrew apfel if it was unlinked by make install.
-	@if command -v brew >/dev/null 2>&1 && brew list apfel >/dev/null 2>&1; then \
+	@# Restore Homebrew apfel-plus if it was unlinked by make install.
+	@if command -v brew >/dev/null 2>&1 && brew list apfel-plus >/dev/null 2>&1; then \
 		if ! [ -L "$$(brew --prefix)/bin/$(BINARY)" ]; then \
-			echo "restoring Homebrew apfel link..."; \
-			brew link apfel 2>/dev/null || true; \
+			echo "restoring Homebrew apfel-plus link..."; \
+			brew link apfel-plus 2>/dev/null || true; \
 		fi; \
 	fi
 
@@ -260,7 +260,7 @@ benchmark:
 
 package-release-asset:
 	@v=$$(cat $(VERSION_FILE)); \
-	asset="apfel-$$v-arm64-macos.tar.gz"; \
+	asset="apfel-plus-$$v-arm64-macos.tar.gz"; \
 	if [ ! -x ".build/release/$(BINARY)" ]; then \
 		echo "error: missing .build/release/$(BINARY). Build a release binary first."; \
 		exit 1; \
@@ -280,11 +280,11 @@ package-release-asset:
 
 print-release-asset:
 	@v=$$(cat $(VERSION_FILE)); \
-	echo "apfel-$$v-arm64-macos.tar.gz"
+	echo "apfel-plus-$$v-arm64-macos.tar.gz"
 
 print-release-sha256:
 	@v=$$(cat $(VERSION_FILE)); \
-	asset="apfel-$$v-arm64-macos.tar.gz"; \
+	asset="apfel-plus-$$v-arm64-macos.tar.gz"; \
 	if [ ! -f "$$asset" ]; then \
 		echo "error: missing $$asset. Run make package-release-asset first."; \
 		exit 1; \
@@ -293,7 +293,7 @@ print-release-sha256:
 
 update-homebrew-formula:
 	@if [ -z "$(HOMEBREW_FORMULA_OUTPUT)" ]; then \
-		echo "error: set HOMEBREW_FORMULA_OUTPUT=/path/to/Formula/apfel.rb"; \
+		echo "error: set HOMEBREW_FORMULA_OUTPUT=/path/to/Formula/apfel-plus.rb"; \
 		exit 1; \
 	fi
 	@if [ -z "$(HOMEBREW_FORMULA_SHA256)" ]; then \

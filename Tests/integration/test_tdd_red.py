@@ -1,8 +1,8 @@
 """
-apfel Integration Tests — TDD RED batch (branch tdd/red-tests-167-183)
+apfel-plus Integration Tests — TDD RED batch (branch tdd/red-tests-167-183)
 
 DELIBERATELY FAILING tests, one per ticket that cannot be reached from the
-pure-Swift unit target (see Package.swift: apfel-tests depends only on
+pure-Swift unit target (see Package.swift: apfel-plus-tests depends only on
 ApfelCore + ApfelCLI, so executable-target bugs and server/CLI features are
 red-tested here at the wire/CLI boundary).
 
@@ -33,7 +33,7 @@ import httpx
 import pytest
 
 ROOT = pathlib.Path(__file__).resolve().parents[2]
-BINARY = ROOT / ".build" / "release" / "apfel"
+BINARY = ROOT / ".build" / "release" / "apfel-plus"
 BASE = "http://localhost:11434"
 BASE_URL = f"{BASE}/v1"
 MODEL = "apple-foundationmodel"
@@ -109,7 +109,7 @@ def test_168_top_p_and_greedy_mapping():
     FIXED (#168): the sampling policy was extracted into a pure,
     FoundationModels-free decision — SamplingDecision.resolve(temperature:topP:seed:)
     in ApfelCore — so it is exercised deterministically by the unit suite
-    (Tests/apfelTests/SamplingDecisionTests.swift, runSamplingDecisionTests):
+    (Tests/apfelPlusTests/SamplingDecisionTests.swift, runSamplingDecisionTests):
     top_p -> .nucleus(probabilityThreshold:seed:), temperature:0 (no top_p) ->
     .greedy, seed-only -> .topK(top:50,seed:). The executable's
     makeGenerationOptions/makeSamplingMode translate that decision into the SDK's
@@ -231,7 +231,7 @@ def test_175_summarize_keeps_prompt_within_budget():
     emits a summary long enough to overflow the precise (budget - output
     reserve) window is non-deterministic, so a coarse prompt_tokens assertion is
     a false green. trimWithSummary lives in the executable target, which the
-    pure-Swift apfel-tests target cannot import — so the deterministic test
+    pure-Swift apfel-plus-tests target cannot import — so the deterministic test
     cannot run there either.
 
     FIXED (#175): generateSummary now passes a computed maximumResponseTokens
@@ -262,7 +262,7 @@ def test_179_streaming_refusal_counts_pre_refusal_tokens():
     A client cannot force the model to stream content and THEN refuse, so the
     accounting itself is exercised deterministically in the pure-Swift unit
     suite via StreamErrorResolver.refusalCompletionText (see
-    Tests/apfelTests/StreamErrorResolverTests.swift). The fix extracted that
+    Tests/apfelPlusTests/StreamErrorResolverTests.swift). The fix extracted that
     seam and wired the streaming refusal branch in Sources/Handlers.swift to
     count `prev + explanation` rather than `explanation` alone. This test
     guards that wiring at the source level so the bug cannot silently regress.
@@ -295,7 +295,7 @@ def test_182_streaming_retry_prints_output_once():
 
     The deterministic coverage lives in the pure-Swift unit suite, which can feed
     the sink a scripted failed-then-retried cumulative-snapshot sequence without
-    the live model — see Tests/apfelTests/StreamPrintSinkTests.swift
+    the live model — see Tests/apfelPlusTests/StreamPrintSinkTests.swift
     (runStreamPrintSinkTests), in particular
     "feed: a retry that re-streams the printed prefix does NOT reprint it (#182)".
     A mid-stream .rateLimited/.concurrentRequest error still cannot be forced from

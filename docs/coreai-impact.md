@@ -1,4 +1,4 @@
-# WWDC 2026 on-device AI - what it means for apfel
+# WWDC 2026 on-device AI - what it means for apfel-plus
 
 > Knowledge page. Last researched 2026-06-09 against Apple's docs:
 > [developer.apple.com/documentation/updates/foundationmodels](https://developer.apple.com/documentation/updates/foundationmodels)
@@ -8,27 +8,27 @@
 
 ## TL;DR
 
-WWDC 2026 surfaced two things. **The one that matters for apfel is the FoundationModels OS 27
-update** - not the "Core AI" rename, which is a non-event for apfel core.
+WWDC 2026 surfaced two things. **The one that matters for apfel-plus is the FoundationModels OS 27
+update** - not the "Core AI" rename, which is a non-event for apfel-plus core.
 
-**The real story: FoundationModels gets a substantial OS 27 update.** apfel is built on
+**The real story: FoundationModels gets a substantial OS 27 update.** apfel-plus is built on
 FoundationModels (`LanguageModelSession`, `SystemLanguageModel`), and Apple's official updates page
 confirms (not press speculation):
 
 - A **new on-device model** (reportedly Gemini-distilled) - Apple says *"test your prompts with the
-  new model."* apfel must re-qualify on OS 27 (#193).
+  new model."* apfel-plus must re-qualify on OS 27 (#193).
 - A new **`LanguageModel` protocol** plus open-source **`CoreAILanguageModel`/`MLXLanguageModel`** -
   an official bridge to drive any model through the FoundationModels session API. This makes a
   bring-your-own-model path tractable (#195).
-- **`ToolCallingMode`** and **improved error types** - adoption candidates for apfel (#197).
+- **`ToolCallingMode`** and **improved error types** - adoption candidates for apfel-plus (#197).
 - **On-device context window still reads 4096**; the bigger window is the cloud
-  `PrivateCloudComputeLanguageModel`, which apfel does not use - so apfel's 4096 docs likely stand (#192).
+  `PrivateCloudComputeLanguageModel`, which apfel-plus does not use - so apfel-plus's 4096 docs likely stand (#192).
 
 **The non-event: "Core AI" is just the Core ML successor.** It is a low-level tensor inference runtime
 (`AIModel`/`NDArray`/`InferenceFunction`), **not** a replacement for FoundationModels, with no chat,
-prompts, tool calling, or server surface. apfel needs **no Core AI code** and **no migration**. Core AI
+prompts, tool calling, or server surface. apfel-plus needs **no Core AI code** and **no migration**. Core AI
 only matters as the runtime behind the new `CoreAILanguageModel` bridge above. The rest of this page
-explains exactly what Core AI is and is not, so the recurring "why doesn't apfel use Core AI?" question
+explains exactly what Core AI is and is not, so the recurring "why doesn't apfel-plus use Core AI?" question
 is answered once.
 
 ## What Core AI actually is
@@ -64,30 +64,30 @@ WWDC 2026 (keynote 2026-06-08), shipping with the iOS 27 / macOS 27 generation. 
 | Misconception | Reality |
 |---|---|
 | "Core AI replaces FoundationModels" | No. Different framework, different layer. FoundationModels is the developer-facing LLM API; Core AI is the Core ML successor (generic inference). |
-| "apfel must migrate to Core AI" | No. There is nothing to migrate. apfel needs LLM sessions/prompts/tools, which Core AI does not provide. |
-| "Core AI adds tool calling / structured output / embeddings" | No. None of these exist in Core AI. Those live in FoundationModels (and apfel's own out-of-band tool layer). |
+| "apfel-plus must migrate to Core AI" | No. There is nothing to migrate. apfel-plus needs LLM sessions/prompts/tools, which Core AI does not provide. |
+| "Core AI adds tool calling / structured output / embeddings" | No. None of these exist in Core AI. Those live in FoundationModels (and apfel-plus's own out-of-band tool layer). |
 | "Core AI deprecates FoundationModels" | No. FoundationModels is untouched by the Core AI announcement. Core ML continues in compatibility mode. |
-| "Core AI gives apfel a new OpenAI-compatible server" | No. Core AI is purely on-device inference. No HTTP, no OpenAI compat, no MCP, no agents. |
+| "Core AI gives apfel-plus a new OpenAI-compatible server" | No. Core AI is purely on-device inference. No HTTP, no OpenAI compat, no MCP, no agents. |
 
-## Where apfel sits in Apple's AI stack
+## Where apfel-plus sits in Apple's AI stack
 
 ```
-apfel  (CLI + OpenAI-compatible server + chat)
-  └─ FoundationModels      ← apfel is built ENTIRELY on this
+apfel-plus  (CLI + OpenAI-compatible server + chat)
+  └─ FoundationModels      ← apfel-plus is built ENTIRELY on this
        (on-device LLM: sessions, prompts, guided generation, tool support, tokenCount)
-  └─ Core AI               ← the Core ML successor; apfel does NOT use this today
+  └─ Core AI               ← the Core ML successor; apfel-plus does NOT use this today
        (tensor inference runtime: AIModel / NDArray / InferenceFunction)
   └─ Apple silicon (CPU / GPU / Neural Engine)
 ```
 
 FoundationModels is almost certainly implemented on top of the same runtime layer Core AI now
-exposes, but apfel only ever talks to FoundationModels. Core AI is the layer below the line apfel
+exposes, but apfel-plus only ever talks to FoundationModels. Core AI is the layer below the line apfel-plus
 draws.
 
-## Direct impact on apfel: effectively none
+## Direct impact on apfel-plus: effectively none
 
-- **CLI tool** (`apfel "prompt"`): unaffected.
-- **OpenAI-compatible server** (`apfel --serve`): unaffected. Core AI has no server or
+- **CLI tool** (`apfel-plus "prompt"`): unaffected.
+- **OpenAI-compatible server** (`apfel-plus --serve`): unaffected. Core AI has no server or
   OpenAI-compatible concept to align with.
 - **Chat / MCP / tool calling**: unaffected.
 - **ApfelCore library**: unaffected. It is FoundationModels-free pure Swift; Core AI adds nothing
@@ -100,46 +100,46 @@ intact.
 
 ## Indirect / adjacent items worth tracking
 
-These are the things that actually matter for apfel from the WWDC 2026 / OS 27 cycle. None are
+These are the things that actually matter for apfel-plus from the WWDC 2026 / OS 27 cycle. None are
 Core AI per se, but they ship in the same window and Core AI is the headline that surfaced them.
 
 > **Update 2026-06-09: these are now confirmed by Apple's official
 > [Foundation Models updates](https://developer.apple.com/documentation/updates/foundationmodels)
 > page (June 2026 / OS 27 entries), not just press reporting.** Details folded into the items below.
 
-1. **FoundationModels context window - on-device window appears UNCHANGED at 4096.** apfel's docs and
+1. **FoundationModels context window - on-device window appears UNCHANGED at 4096.** apfel-plus's docs and
    behavior are built around a hard **4096-token** context (input + output combined). The figure
    appears across `README.md`, `docs/context-strategies.md`, `docs/integrations.md`,
    `docs/openai-api-compatibility.md`, `docs/mcp-calculator.md` and is the basis for the whole
    context-strategy subsystem. The OS 27 updates page still references **4,096 tokens** for the
    on-device model; the "larger context size" Apple advertises is via the new
-   `PrivateCloudComputeLanguageModel` (a **cloud** path apfel deliberately does not use). So apfel's
+   `PrivateCloudComputeLanguageModel` (a **cloud** path apfel-plus deliberately does not use). So apfel-plus's
    on-device 4096 assumption most likely **holds** on OS 27. Still confirm the real number on OS 27
    hardware via `SystemLanguageModel.contextSize` (the API added in 26.4 that removes the hardcode).
 
 2. **FoundationModels base model change - CONFIRMED.** Apple's updates page states verbatim: *"the
    model changes when a person updates to iOS 27, iPadOS 27, macOS 27, and visionOS 27, test your
    prompts with the new model to verify your app's behavior."* (The new on-device model is reported to
-   be distilled from Google Gemini under a multi-year Apple/Google deal.) apfel inherits any change in
+   be distilled from Google Gemini under a multi-year Apple/Google deal.) apfel-plus inherits any change in
    tool-call formatting, refusal behavior, tokenization, or token counts. These are exactly the
-   surfaces apfel's recent bug fixes (#176-#183, #187) hardened, so re-qualification on OS 27 hardware
+   surfaces apfel-plus's recent bug fixes (#176-#183, #187) hardened, so re-qualification on OS 27 hardware
    is required, not optional.
 
-3. **New FoundationModels APIs in OS 27 that touch apfel.** The June 2026 updates also add:
+3. **New FoundationModels APIs in OS 27 that touch apfel-plus.** The June 2026 updates also add:
    `GenerationOptions.ToolCallingMode` (control how the model interacts with tools - relevant to
-   apfel's out-of-band tool layer); improved error types `LanguageModelError`,
+   apfel-plus's out-of-band tool layer); improved error types `LanguageModelError`,
    `SystemLanguageModel.Error`, `LanguageModelSession.Error` (relevant to `ApfelError.classify` and
    parked ticket #119); a `DynamicProfile` agentic API; and image analysis (`OCRTool`,
-   `BarcodeReaderTool`). apfel should evaluate whether to adopt `ToolCallingMode` and the new error
-   types; the rest (image, agentic, cloud) are out of scope for apfel's golden goal.
+   `BarcodeReaderTool`). apfel-plus should evaluate whether to adopt `ToolCallingMode` and the new error
+   types; the rest (image, agentic, cloud) are out of scope for apfel-plus's golden goal.
 
-4. **macOS 27 build + runtime compatibility.** apfel pins `platforms: [.macOS(.v26)]`. We need to
-   confirm: apfel builds against the OS 27 SDK, FoundationModels availability gates still hold,
+4. **macOS 27 build + runtime compatibility.** apfel-plus pins `platforms: [.macOS(.v26)]`. We need to
+   confirm: apfel-plus builds against the OS 27 SDK, FoundationModels availability gates still hold,
    `SystemLanguageModel.tokenCount` and `GenerationOptions` are unchanged, and the test suite is
    green on an OS 27 machine. The "macOS 26 Tahoe required" gotcha messaging may need a note.
 
-5. **User confusion ("why doesn't apfel use Core AI?").** Once Core AI is in the press, expect
-   issues asking why apfel is not "on Core AI", or requests to run third-party models. We should
+5. **User confusion ("why doesn't apfel-plus use Core AI?").** Once Core AI is in the press, expect
+   issues asking why apfel-plus is not "on Core AI", or requests to run third-party models. We should
    have a one-paragraph canned answer (this page) so triage is fast and consistent.
 
 ## Opportunity: bring-your-own-model (future, likely a sister tool)
@@ -155,27 +155,27 @@ Core AI per se, but they ship in the same window and Core AI is the headline tha
 
 Core AI's genuinely new capability is running **non-Apple model weights** on Apple silicon from an
 `.aimodel` file, with explicit compute-unit and caching control. With the new bridge it is more
-tractable, but it is still a different project from apfel core:
+tractable, but it is still a different project from apfel-plus core:
 
-- It would mean shipping/loading model weights (apfel today downloads nothing - "no downloads" is a
+- It would mean shipping/loading model weights (apfel-plus today downloads nothing - "no downloads" is a
   selling point).
 - The hard parts (tokenizer, sampling, KV cache, chat templating) are largely handled if you go
   through `LanguageModel` + `CoreAILanguageModel`, rather than calling `InferenceFunction.run` on raw
   `NDArray`s yourself. The spike should confirm exactly how much the bridge gives you for free.
-- It fits the apfel-family pattern (apfel-tag, apfel-spot, apfel-mcp, apfel-server-kit) far better
-  than apfel core. If pursued, it should be a **separate repo** (working name e.g. `apfel-coreai` or
+- It fits the apfel-plus-family pattern (apfel-plus-tag, apfel-plus-spot, apfel-plus-mcp, apfel-plus-server-kit) far better
+  than apfel-plus core. If pursued, it should be a **separate repo** (working name e.g. `apfel-plus-coreai` or
   `aimodel-serve`), evaluated with a research spike first.
 
-Recommendation: **do not** put Core AI into apfel core. Track it, write a spike against the
+Recommendation: **do not** put Core AI into apfel-plus core. Track it, write a spike against the
 `LanguageModel`/`CoreAILanguageModel` bridge, decide later.
 
 ## Decision / recommendation
 
-1. **No code changes to apfel for Core AI itself.** Nothing to do.
+1. **No code changes to apfel-plus for Core AI itself.** Nothing to do.
 2. **Add this page + a short README/FAQ pointer** so the positioning is clear and triage is fast.
 3. **Open a tracking epic** covering the adjacent OS 27 / FoundationModels items above, gated on real
    OS 27 hardware availability.
-4. **Park the bring-your-own-model idea** as a research spike for a possible sister tool, not apfel
+4. **Park the bring-your-own-model idea** as a research spike for a possible sister tool, not apfel-plus
    core.
 
 ## Sources
@@ -197,7 +197,7 @@ FoundationModels OS 27 updates (official, fetched 2026-06-09):
   `GenerationOptions.ToolCallingMode`, improved error types, `DynamicProfile`, image analysis,
   `PrivateCloudComputeLanguageModel` (cloud, larger context).
 - The on-device context window still reads **4,096 tokens** on this page; the larger context is the
-  cloud `PrivateCloudComputeLanguageModel`, which apfel does not use.
+  cloud `PrivateCloudComputeLanguageModel`, which apfel-plus does not use.
 
 Context / reporting: WWDC 2026 keynote coverage (2026-06-08) on the Core ML to Core AI rename, the
 FoundationModels coexistence story, and the Apple/Google Gemini base-model collaboration. The

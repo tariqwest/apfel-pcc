@@ -1,5 +1,5 @@
 // ============================================================================
-// ManPageTests.swift - Unit tests for the man/apfel.1.in troff source.
+// ManPageTests.swift - Unit tests for the man/apfel-plus.1.in troff source.
 // Checks that the committed man-page template is well-formed.
 // Drift-prevention (flag coverage vs --help) lives in the integration suite
 // since it needs the built binary.
@@ -24,9 +24,9 @@ func runManPageTests() {
     }
 
     let root = findRepoRoot()
-    let manPath = root.appendingPathComponent("man/apfel.1.in").path
+    let manPath = root.appendingPathComponent("man/apfel-plus.1.in").path
 
-    test("man/apfel.1.in exists") {
+    test("man/apfel-plus.1.in exists") {
         try assertTrue(FileManager.default.fileExists(atPath: manPath),
                        "expected troff source at \(manPath)")
     }
@@ -63,7 +63,7 @@ func runManPageTests() {
 
     test("man page has .TH header with @VERSION@ placeholder") {
         let text = (try? String(contentsOfFile: manPath, encoding: .utf8)) ?? ""
-        try assertTrue(text.contains(".TH APFEL 1"),
+        try assertTrue(text.contains(".TH APFEL-PLUS 1"),
                        "missing .TH header")
         try assertTrue(text.contains("@VERSION@"),
                        "expected @VERSION@ placeholder in .TH header")
@@ -90,8 +90,8 @@ func runManPageTests() {
     test("man page starts with a properly formed .TH line") {
         let text = (try? String(contentsOfFile: manPath, encoding: .utf8)) ?? ""
         let firstLine = text.split(separator: "\n").first.map(String.init) ?? ""
-        // Expect: .TH APFEL 1 "YYYY-MM-DD" "apfel @VERSION@" "User Commands"
-        try assertTrue(firstLine.hasPrefix(".TH APFEL 1"),
+        // Expect: .TH APFEL-PLUS 1 "YYYY-MM-DD" "apfel-plus @VERSION@" "User Commands"
+        try assertTrue(firstLine.hasPrefix(".TH APFEL-PLUS 1"),
                        "first line should be .TH header, got: \(firstLine)")
         try assertTrue(firstLine.contains("\"User Commands\""),
                        "expected section label \"User Commands\" in .TH")

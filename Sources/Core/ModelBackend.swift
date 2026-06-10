@@ -11,9 +11,9 @@ import Foundation
 
 /// Which Apple Foundation Models backend serves a request.
 ///
-/// `apfel` is on-device by default. Callers opt into Apple's Private Cloud
+/// `apfel-plus` is on-device by default. Callers opt into Apple's Private Cloud
 /// Compute by passing `--pcc` on the CLI or by setting the request's
-/// `model` field to `apple-foundationmodel-pcc` (or the `pcc` / `apfel-pcc`
+/// `model` field to `apple-foundationmodel-pcc` (or the `pcc` / `apfel-plus-pcc`
 /// aliases) on `/v1/chat/completions`.
 public enum ModelBackend: String, Sendable, Equatable, Hashable, CustomStringConvertible {
     /// On-device SystemLanguageModel (~3B params, 4096-token context, free, offline).
@@ -48,7 +48,7 @@ public enum ModelBackend: String, Sendable, Equatable, Hashable, CustomStringCon
     /// Parse a request's `model` field into a backend choice.
     ///
     /// Unknown values fall back to `.onDevice`: OpenAI clients routinely hard-code
-    /// model ids like `gpt-4`, and apfel has always served them locally rather
+    /// model ids like `gpt-4`, and apfel-plus has always served them locally rather
     /// than rejecting the request. PCC is strictly opt-in via the documented
     /// aliases.
     public static func from(modelName: String?) -> ModelBackend {
@@ -60,7 +60,7 @@ public enum ModelBackend: String, Sendable, Equatable, Hashable, CustomStringCon
         }
         switch raw {
         case "pcc",
-             "apfel-pcc",
+             "apfel-plus-pcc",
              "apple-foundationmodel-pcc":
             return .privateCloudCompute
         default:

@@ -2,17 +2,17 @@
 
 The shape of the setup is:
 
-1. Run `apfel --serve` as a local OpenAI-compatible server.
+1. Run `apfel-plus --serve` as a local OpenAI-compatible server.
 2. Use the Continue extension in Visual Studio Code.
-3. Route **chat/code review** to local `apfel`.
+3. Route **chat/code review** to local `apfel-plus`.
 4. Route **edit/apply** to a second model.
 5. Keep `~/.continue/.env` in sync from the shell so Continue can read `OPENAI_API_KEY`.
 
 For the underlying API contract, see [openai-api-compatibility.md](openai-api-compatibility.md) and [server-security.md](server-security.md).
 
-## 1. Start `apfel` as the local server
+## 1. Start `apfel-plus` as the local server
 
-Use `apfel` as the local OpenAI-compatible base URL:
+Use `apfel-plus` as the local OpenAI-compatible base URL:
 
 ```text
 http://127.0.0.1:11434/v1
@@ -21,18 +21,18 @@ http://127.0.0.1:11434/v1
 Start it in the foreground:
 
 ```bash
-apfel --serve
+apfel-plus --serve
 ```
 
 Or run it in the background:
 
 ```bash
-brew services start apfel
+brew services start apfel-plus
 ```
 
 Background-service details: [background-service.md](background-service.md)
 
-Important: use **Chat Completions**, not the newer Responses API. `apfel` supports `POST /v1/chat/completions` and does not implement `POST /v1/responses`.
+Important: use **Chat Completions**, not the newer Responses API. `apfel-plus` supports `POST /v1/chat/completions` and does not implement `POST /v1/responses`.
 
 ## 2. Install the Continue extension in Visual Studio Code
 
@@ -45,7 +45,7 @@ Continue reads configuration from:
 
 ## 3. Configure Continue with two models
 
-Use local `apfel` for safer chat/review work and a second model for edit/apply.
+Use local `apfel-plus` for safer chat/review work and a second model for edit/apply.
 
 Create or replace `~/.continue/config.yaml` with:
 
@@ -55,7 +55,7 @@ version: 0.0.1
 schema: v1
 
 models:
-  - name: apfel-review
+  - name: apfel-plus-review
     provider: openai
     model: apple-foundationmodel
     apiBase: http://127.0.0.1:11434/v1
@@ -93,10 +93,10 @@ context:
 
 Why this split works:
 
-- `apfel-review` is restricted to `chat`, so it becomes the local review lane.
+- `apfel-plus-review` is restricted to `chat`, so it becomes the local review lane.
 - `gpt-5.1-apply` handles `edit` and `apply`, where a stronger hosted model is more useful.
 - `temperature: 0.0` keeps both lanes deterministic.
-- `contextLength: 4096` matches `apfel`'s local context budget.
+- `contextLength: 4096` matches `apfel-plus`'s local context budget.
 
 ## 4. Provide `OPENAI_API_KEY` to Continue
 
@@ -144,7 +144,7 @@ Cmd + Shift + P -> Developer: Restart Extension Host
 
 ## 7. Recommended day-to-day usage
 
-Use local `apfel` for:
+Use local `apfel-plus` for:
 
 - review the current diff
 - review the selected function
@@ -159,23 +159,23 @@ Use the hosted edit/apply model for:
 - rewriting a selected block
 - generating a patch after review findings are clear
 
-This is the important habit: keep `apfel` focused on **small review contexts**. It works best on a diff, one file, or one selected region, not giant repo-wide prompts.
+This is the important habit: keep `apfel-plus` focused on **small review contexts**. It works best on a diff, one file, or one selected region, not giant repo-wide prompts.
 
 ## 8. Typical workflow
 
-1. Start `apfel` with `apfel --serve` or `brew services start apfel`.
+1. Start `apfel-plus` with `apfel-plus --serve` or `brew services start apfel-plus`.
 2. Open Visual Studio Code.
 3. Run `cli` in your shell to authenticate Codex and update `~/.continue/.env`.
 4. Restart the Visual Studio Code extension host.
-5. Ask Continue chat to review the current diff or selected code using the local `apfel-review` model.
+5. Ask Continue chat to review the current diff or selected code using the local `apfel-plus-review` model.
 6. Once the review is clear, use Edit/Apply to hand the actual code change to the hosted `gpt-5.1-apply` model.
 7. Run `clo` when you are done to clear the shell key and remove `OPENAI_API_KEY` from `~/.continue/.env`.
 
 ## 9. Troubleshooting
 
-If Continue cannot talk to local `apfel`:
+If Continue cannot talk to local `apfel-plus`:
 
-- make sure `apfel --serve` is running
+- make sure `apfel-plus --serve` is running
 - confirm the base URL is `http://127.0.0.1:11434/v1`
 - confirm the model name is `apple-foundationmodel`
 - make sure the client is using Chat Completions, not Responses
@@ -188,7 +188,7 @@ If Continue cannot use the hosted edit/apply model:
 
 If you need a browser client instead of Continue:
 
-- use `apfel --serve --cors --allowed-origins "<your local origin>"`
+- use `apfel-plus --serve --cors --allowed-origins "<your local origin>"`
 
 For security and browser details, see [server-security.md](server-security.md).
 

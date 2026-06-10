@@ -203,7 +203,7 @@ extension CLIArguments {
 
         // Parser-phase state. Mode-setting flags are recorded in
         // `context.modeFlagsSeen` so the post-parse validate() step can detect
-        // conflicts like `apfel --chat --serve`. --help/-h/--version/-v
+        // conflicts like `apfel-plus --chat --serve`. --help/-h/--version/-v
         // /--release short-circuit out of parse entirely and do not
         // participate in conflict detection.
         var context = ValidationContext()
@@ -544,7 +544,7 @@ extension CLIArguments {
         let ext = (path.lowercased() as NSString).pathExtension
         switch ext {
         case "jpg", "jpeg", "png", "gif", "webp", "heic", "heif", "tiff", "bmp", "svg", "ico":
-            return "cannot attach image: \(path) -- the on-device model is text-only (no vision). Try: tesseract \(path) stdout | apfel \"describe this\""
+            return "cannot attach image: \(path) -- the on-device model is text-only (no vision). Try: tesseract \(path) stdout | apfel-plus \"describe this\""
         case "pdf", "zip", "tar", "gz", "dmg", "pkg", "exe", "bin", "dat", "mp3", "mp4", "mov", "avi", "wav":
             return "cannot attach binary file: \(path) -- only text files are supported"
         default:

@@ -15,7 +15,7 @@
 //
 // It is complementary to `swift package diagnose-api-breaking-changes` — that
 // tool runs on CI and against the last tag; this file runs on every `swift
-// run apfel-tests` and against HEAD, so it catches breakage within a single
+// run apfel-plus-tests` and against HEAD, so it catches breakage within a single
 // commit before it reaches CI.
 //
 // Runtime assertions here are minimal and exist only so the test harness has

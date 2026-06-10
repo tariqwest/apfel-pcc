@@ -1,46 +1,46 @@
-.TH APFEL 1 "2026-04-17" "apfel @VERSION@" "User Commands"
+.TH APFEL-PLUS 1 "2026-04-17" "apfel-plus @VERSION@" "User Commands"
 .SH NAME
-apfel \- Apple Intelligence from the command line
+apfel-plus \- Apple Intelligence from the command line
 .SH SYNOPSIS
-.B apfel
+.B apfel-plus
 .RI [ options ]
 .RI [ prompt ]
 .br
-.B apfel
+.B apfel-plus
 .B \-f
 .I file
 .RI [ options ]
 .I prompt
 .br
-.B apfel
+.B apfel-plus
 .B \-\-chat
 .RI [ options ]
 .br
-.B apfel
+.B apfel-plus
 .B \-\-stream
 .RI [ options ]
 .I prompt
 .br
-.B apfel
+.B apfel-plus
 .B \-\-serve
 .RI [ server-options ]
 .br
-.B apfel
+.B apfel-plus
 .B \-\-benchmark
 .br
-.B apfel
+.B apfel-plus
 .B \-\-model-info
 .br
-.B apfel
+.B apfel-plus
 .B \-\-update
 .SH DESCRIPTION
-.B apfel
+.B apfel-plus
 is a command-line interface and OpenAI-compatible HTTP server for
 Apple's on-device FoundationModels large language model. Inference
 runs entirely on-device on Apple Silicon Macs that have Apple
 Intelligence enabled. No data leaves the machine for inference.
 .PP
-.B apfel
+.B apfel-plus
 has three modes:
 .TP
 .B unix tool
@@ -147,7 +147,7 @@ per request by setting
 to
 .B apple-foundationmodel-pcc
 (aliases:
-.BR pcc ", " apfel-pcc ).
+.BR pcc ", " apfel-plus-pcc ).
 .TP
 .BR \-\-retry " [" \fIn\fR ]
 Enable retry with exponential backoff on transient errors. Defaults
@@ -343,26 +343,26 @@ Rate limited or busy. Exceeded
 or a concurrent session lock is held.
 .SH FILES
 .TP
-.I /usr/local/bin/apfel
+.I /usr/local/bin/apfel-plus
 Binary installed by
 .BR "make install" .
 .TP
-.I /usr/local/share/man/man1/apfel.1
+.I /usr/local/share/man/man1/apfel-plus.1
 This manual page.
 .TP
-.I $(brew --prefix)/bin/apfel
+.I $(brew --prefix)/bin/apfel-plus
 Binary installed by
-.BR "brew install apfel" .
+.BR "brew install apfel-plus" .
 .TP
-.I $(brew --prefix)/Cellar/apfel/<version>/homebrew.mxcl.apfel.plist
+.I $(brew --prefix)/Cellar/apfel-plus/<version>/homebrew.mxcl.apfel-plus.plist
 launchd plist used by the Homebrew service integration
-.RB ( "brew services start apfel" ).
+.RB ( "brew services start apfel-plus" ).
 .SH EXAMPLES
 Send a single prompt:
 .PP
 .RS 4
 .nf
-apfel "What is the capital of Austria?"
+apfel-plus "What is the capital of Austria?"
 .fi
 .RE
 .PP
@@ -370,7 +370,7 @@ Stream a haiku:
 .PP
 .RS 4
 .nf
-apfel --stream "Write a haiku about code"
+apfel-plus --stream "Write a haiku about code"
 .fi
 .RE
 .PP
@@ -378,7 +378,7 @@ Run an interactive session with a custom personality:
 .PP
 .RS 4
 .nf
-apfel -s "You are a pirate" --chat
+apfel-plus -s "You are a pirate" --chat
 .fi
 .RE
 .PP
@@ -386,7 +386,7 @@ Pipe input from standard input:
 .PP
 .RS 4
 .nf
-cat README.md | apfel "Summarize this"
+cat README.md | apfel-plus "Summarize this"
 .fi
 .RE
 .PP
@@ -395,7 +395,7 @@ Extract the response in JSON mode with
 .PP
 .RS 4
 .nf
-apfel -o json "Translate to German: hello" | jq -r .content
+apfel-plus -o json "Translate to German: hello" | jq -r .content
 .fi
 .RE
 .PP
@@ -403,7 +403,7 @@ Start the OpenAI-compatible server on port 3000 with CORS:
 .PP
 .RS 4
 .nf
-apfel --serve --port 3000 --host 0.0.0.0 --cors
+apfel-plus --serve --port 3000 --host 0.0.0.0 --cors
 .fi
 .RE
 .PP
@@ -411,13 +411,13 @@ Attach an MCP calculator server and ask a math question:
 .PP
 .RS 4
 .nf
-apfel --mcp mcp/calculator/server.py "What is 127 * 31?"
+apfel-plus --mcp mcp/calculator/server.py "What is 127 * 31?"
 .fi
 .RE
 .SH BUGS
 Report bugs at
-.UR https://github.com/Arthur-Ficial/apfel/issues
-https://github.com/Arthur-Ficial/apfel/issues
+.UR https://github.com/tariqwest/apfel-plus/issues
+https://github.com/tariqwest/apfel-plus/issues
 .UE .
 .PP
 Known limitations:
@@ -439,8 +439,8 @@ Intelligence enabled in System Settings.
 .BR man (1).
 .PP
 Project homepage and full documentation:
-.UR https://github.com/Arthur-Ficial/apfel
-https://github.com/Arthur-Ficial/apfel
+.UR https://github.com/tariqwest/apfel-plus
+https://github.com/tariqwest/apfel-plus
 .UE .
 .SH AUTHORS
 Franz Enzenhofer and contributors.

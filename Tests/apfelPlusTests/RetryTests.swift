@@ -1,6 +1,6 @@
 // ============================================================================
 // RetryTests.swift — Tests for retry logic: isRetryableError + withRetry
-// Part of apfel test suite
+// Part of apfel-plus test suite
 // ============================================================================
 
 import Foundation

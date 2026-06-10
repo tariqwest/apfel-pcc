@@ -1,15 +1,15 @@
 # Context Strategies
 
-apfel manages the 4096-token context window automatically so chat sessions and long prompts do not crash. Choose a strategy with `--context-strategy` based on what you want apfel to keep when history approaches the limit.
+apfel-plus manages the 4096-token context window automatically so chat sessions and long prompts do not crash. Choose a strategy with `--context-strategy` based on what you want apfel-plus to keep when history approaches the limit.
 
 ```bash
-apfel --chat --context-strategy newest-first     # default: keep recent turns
-apfel --chat --context-strategy oldest-first     # keep earliest turns
-apfel --chat --context-strategy sliding-window --context-max-turns 6
-apfel --chat --context-strategy summarize        # compress old turns via on-device model
-apfel --chat --context-strategy strict           # error on overflow, no trimming
-apfel --chat --context-output-reserve 256        # custom output token reserve
-apfel --chat --context-status                    # print context fill after each turn
+apfel-plus --chat --context-strategy newest-first     # default: keep recent turns
+apfel-plus --chat --context-strategy oldest-first     # keep earliest turns
+apfel-plus --chat --context-strategy sliding-window --context-max-turns 6
+apfel-plus --chat --context-strategy summarize        # compress old turns via on-device model
+apfel-plus --chat --context-strategy strict           # error on overflow, no trimming
+apfel-plus --chat --context-output-reserve 256        # custom output token reserve
+apfel-plus --chat --context-status                    # print context fill after each turn
 ```
 
 ## Strategies
@@ -28,7 +28,7 @@ apfel --chat --context-status                    # print context fill after each
 
 ## Context status
 
-`--context-status` prints the current chat context fill after each turn, for example `[context 2381/3584 tokens, 66%, 1203 remaining]`. It uses the same token count and input budget that apfel already checks before rotating context.
+`--context-status` prints the current chat context fill after each turn, for example `[context 2381/3584 tokens, 66%, 1203 remaining]`. It uses the same token count and input budget that apfel-plus already checks before rotating context.
 
 ## Environment variables
 

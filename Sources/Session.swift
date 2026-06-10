@@ -1,6 +1,6 @@
 // ============================================================================
 // Session.swift — FoundationModels session management and streaming
-// Part of apfel — Apple Intelligence from the command line
+// Part of apfel-plus — Apple Intelligence from the command line
 // SHARED by both CLI and server modes.
 // ============================================================================
 

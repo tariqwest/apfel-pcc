@@ -1,14 +1,14 @@
 # How to use the Apple Foundation Model from PHP
 
-Call Apple's on-device Foundation Model from PHP using `openai-php/client`, pointed at a local `apfel --serve`. 100% on-device, zero API cost.
+Call Apple's on-device Foundation Model from PHP using `openai-php/client`, pointed at a local `apfel-plus --serve`. 100% on-device, zero API cost.
 
 Runnable scripts + tests: [Arthur-Ficial/apfel-guides-lab/scripts/php](https://github.com/Arthur-Ficial/apfel-guides-lab/tree/main/scripts/php).
 
 ## Prerequisites
 
 - macOS 26+ Tahoe, Apple Silicon, Apple Intelligence enabled
-- `brew install apfel`
-- `apfel --serve` running (port `11434`)
+- `brew install apfel-plus`
+- `apfel-plus --serve` running (port `11434`)
 - PHP 8.1+ and Composer (`brew install php composer`)
 - `composer require openai-php/client guzzlehttp/guzzle`
 
@@ -126,7 +126,7 @@ $client = OpenAI::factory()->withBaseUri("http://localhost:11434/v1")->withApiKe
 try {
     $client->embeddings()->create([
         "model" => "apple-foundationmodel",
-        "input" => "apfel runs 100% on-device.",
+        "input" => "apfel-plus runs 100% on-device.",
     ]);
 } catch (ErrorException $e) {
     echo "Got expected error (HTTP 501): {$e->getMessage()}\n";
@@ -237,7 +237,7 @@ Lab script: [`06_example.php`](https://github.com/Arthur-Ficial/apfel-guides-lab
 
 ## Tested with
 
-- apfel v1.0.3 / macOS 26.3.1 Apple Silicon
+- apfel-plus v1.0.3 / macOS 26.3.1 Apple Silicon
 - PHP 8.5.5 / openai-php/client 0.10.3 / Guzzle
 - Date: 2026-04-16
 

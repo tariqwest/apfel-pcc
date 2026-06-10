@@ -387,7 +387,7 @@ public struct JSONSchemaSpec: Decodable, Sendable, Equatable, Hashable {
     public let name: String
     /// The raw JSON Schema the output must conform to.
     public let schema: RawJSON?
-    /// Whether strict conformance is requested. apfel always generates against
+    /// Whether strict conformance is requested. apfel-plus always generates against
     /// the schema, so this is accepted and recorded but does not change behaviour.
     public let strict: Bool?
 

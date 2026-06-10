@@ -1,7 +1,7 @@
 // ============================================================================
-// main.swift — Entry point for apfel
+// main.swift — Entry point for apfel-plus
 // Apple Intelligence from the command line.
-// https://github.com/Arthur-Ficial/apfel
+// https://github.com/tariqwest/apfel-plus
 // ============================================================================
 
 import Foundation
@@ -12,7 +12,7 @@ import CReadline
 // MARK: - Configuration
 
 let version = buildVersion
-let appName = "apfel"
+let appName = "apfel-plus"
 let modelName = "apple-foundationmodel"
 
 // MARK: - Exit Codes
@@ -40,8 +40,8 @@ func exitCode(for error: ApfelError) -> Int32 {
 
 apfel_install_sigint_exit_handler(isatty(STDOUT_FILENO) != 0 ? 1 : 0)
 
-// True when stdin is a FIFO/pipe (`command | apfel`) vs a regular file
-// redirect (`apfel < file`). We only suggest `2>&1` for the pipe case;
+// True when stdin is a FIFO/pipe (`command | apfel-plus`) vs a regular file
+// redirect (`apfel-plus < file`). We only suggest `2>&1` for the pipe case;
 // regular files don't need that advice.
 func stdinIsPipe() -> Bool {
     var st = stat()
@@ -53,7 +53,7 @@ func stdinIsPipe() -> Bool {
 
 let rawArgs = Array(CommandLine.arguments.dropFirst())
 
-// No-args + stdin-pipe fast path: `echo "prompt" | apfel` with no flags.
+// No-args + stdin-pipe fast path: `echo "prompt" | apfel-plus` with no flags.
 // Must stay above the parse() call because it needs isatty + await singlePrompt
 // before any parsing happens.
 if rawArgs.isEmpty {
@@ -74,7 +74,7 @@ if rawArgs.isEmpty {
             }
         }
         if stdinIsPipe() {
-            printStderr("\(styled("apfel:", .yellow)) piped input was empty - if the command prints to stderr, try: command 2>&1 | apfel")
+            printStderr("\(styled("apfel-plus:", .yellow)) piped input was empty - if the command prints to stderr, try: command 2>&1 | apfel-plus")
         }
     }
     printUsage()
@@ -129,7 +129,7 @@ if parsed.mode.acceptsStdinInput && isatty(STDIN_FILENO) == 0 {
             fileContents.append(stdinContent)
         }
     } else if !prompt.isEmpty && !quietMode && stdinIsPipe() {
-        printStderr("\(styled("apfel:", .yellow)) piped input was empty - if the command prints to stderr, try: command 2>&1 | apfel")
+        printStderr("\(styled("apfel-plus:", .yellow)) piped input was empty - if the command prints to stderr, try: command 2>&1 | apfel-plus")
     }
 }
 
@@ -193,7 +193,7 @@ default:
             printStderr("")
             printStderr(availability.remediation)
             printStderr("")
-            printStderr("For full diagnostic info run: apfel --model-info")
+            printStderr("For full diagnostic info run: apfel-plus --model-info")
             exit(exitModelUnavailable)
         }
     }

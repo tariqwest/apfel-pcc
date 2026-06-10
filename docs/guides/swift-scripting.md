@@ -1,16 +1,16 @@
 # How to use the Apple Foundation Model from Swift scripts
 
-Call Apple's on-device Foundation Model from a Swift script using `URLSession`. This is the "shell script written in Swift" pattern - fast, native, and pointed at a local `apfel --serve`.
+Call Apple's on-device Foundation Model from a Swift script using `URLSession`. This is the "shell script written in Swift" pattern - fast, native, and pointed at a local `apfel-plus --serve`.
 
 Runnable scripts + tests: [Arthur-Ficial/apfel-guides-lab/scripts/swift-scripting](https://github.com/Arthur-Ficial/apfel-guides-lab/tree/main/scripts/swift-scripting).
 
-> For **in-app** use, you can skip apfel entirely and call `FoundationModels` directly via Apple's own Swift SDK. This guide is for **scripts** - anything you'd run with `swift path/to/file.swift` from the command line.
+> For **in-app** use, you can skip apfel-plus entirely and call `FoundationModels` directly via Apple's own Swift SDK. This guide is for **scripts** - anything you'd run with `swift path/to/file.swift` from the command line.
 
 ## Prerequisites
 
 - macOS 26+ Tahoe, Apple Silicon, Apple Intelligence enabled
-- `brew install apfel`
-- `apfel --serve` running (port `11434`)
+- `brew install apfel-plus`
+- `apfel-plus --serve` running (port `11434`)
 - Xcode Command Line Tools (`xcode-select --install`) - Swift 6 ships with the OS
 
 Swift scripts use `#!/usr/bin/env swift` or just `swift file.swift`.
@@ -228,7 +228,7 @@ Full script: [`06_example.swift`](https://github.com/Arthur-Ficial/apfel-guides-
 
 ## Tested with
 
-- apfel v1.0.3 / macOS 26.3.1 Apple Silicon
+- apfel-plus v1.0.3 / macOS 26.3.1 Apple Silicon
 - Swift 6.3 (system)
 - Date: 2026-04-16
 

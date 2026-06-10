@@ -1,6 +1,6 @@
 // ============================================================================
 // Handlers.swift — HTTP request handlers for OpenAI-compatible API
-// Part of apfel — Apple Intelligence from the command line
+// Part of apfel-plus — Apple Intelligence from the command line
 // ============================================================================
 
 import FoundationModels
@@ -108,7 +108,7 @@ func handleChatCompletion(_ request: Request, context: some RequestContext) asyn
     )
 
     // Per-request backend routing: clients opt into PCC by setting
-    // `model: "apple-foundationmodel-pcc"` (or the `pcc` / `apfel-pcc`
+    // `model: "apple-foundationmodel-pcc"` (or the `pcc` / `apfel-plus-pcc`
     // aliases). Anything else stays on-device. Unknown ids fall through to
     // the on-device default so OpenAI clients that hard-code e.g. `gpt-4`
     // keep working.

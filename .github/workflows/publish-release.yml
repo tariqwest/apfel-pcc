@@ -22,7 +22,7 @@ jobs:
     env:
       GH_TOKEN: ${{ github.token }}
       RELEASE_TYPE: ${{ inputs.release_type }}
-      TAP_REPOSITORY: Arthur-Ficial/homebrew-tap
+      TAP_REPOSITORY: tariqwest/homebrew-tap
       TAP_BRANCH: main
     steps:
       - name: Check out repository
@@ -69,7 +69,7 @@ jobs:
           esac
 
       - name: Run unit tests
-        run: swift run apfel-tests
+        run: swift run apfel-plus-tests
 
       - name: Install Python test dependencies
         run: pip3 install --break-system-packages pytest httpx openai openapi-core pyyaml
@@ -81,8 +81,8 @@ jobs:
           # qualification runs locally via `make preflight`.
 
           # Start servers
-          .build/release/apfel --serve --port 11434 2>/dev/null &
-          .build/release/apfel --serve --port 11435 --mcp mcp/calculator/server.py 2>/dev/null &
+          .build/release/apfel-plus --serve --port 11434 2>/dev/null &
+          .build/release/apfel-plus --serve --port 11435 --mcp mcp/calculator/server.py 2>/dev/null &
 
           # Wait for readiness (15s timeout)
           for i in $(seq 1 15); do
@@ -103,7 +103,7 @@ jobs:
             -v --tb=short
 
           # Cleanup
-          pkill -f "apfel --serve" 2>/dev/null || true
+          pkill -f "apfel-plus --serve" 2>/dev/null || true
 
       - name: Capture release version
         id: version
@@ -121,8 +121,8 @@ jobs:
       - name: Package release artifact
         id: asset
         run: |
-          make package-release-asset >/tmp/apfel-release-asset.txt
-          echo "name=$(tail -1 /tmp/apfel-release-asset.txt)" >> "$GITHUB_OUTPUT"
+          make package-release-asset >/tmp/apfel-plus-release-asset.txt
+          echo "name=$(tail -1 /tmp/apfel-plus-release-asset.txt)" >> "$GITHUB_OUTPUT"
           echo "sha256=$(make print-release-sha256)" >> "$GITHUB_OUTPUT"
 
       - name: Publish GitHub release
@@ -137,8 +137,8 @@ jobs:
             notes+=$(git log --oneline "$prev_tag"..HEAD~1 -- | sed 's/^/- /')
           fi
           notes+=$'\n\n'"---"$'\n'
-          notes+="Install: \`brew install apfel\`"$'\n'
-          notes+="Upgrade: \`brew upgrade apfel\`"
+          notes+="Install: \`brew install apfel-plus\`"$'\n'
+          notes+="Upgrade: \`brew upgrade apfel-plus\`"
 
           if gh release view "v$version" >/dev/null 2>&1; then
             gh release upload "v$version" "$asset" --clobber
@@ -149,13 +149,13 @@ jobs:
           fi
 
       # --- Homebrew tap update ---
-      # This section will be removed after homebrew-core accepts apfel (PR #276365).
+      # This section will be removed after homebrew-core accepts apfel-plus (PR #276365).
       # Until then, the tap is the primary distribution channel.
 
       - name: Check out homebrew tap
         uses: actions/checkout@v6
         with:
-          repository: Arthur-Ficial/homebrew-tap
+          repository: tariqwest/homebrew-tap
           token: ${{ secrets.HOMEBREW_TAP_PUSH_TOKEN }}
           ref: main
           path: homebrew-tap
@@ -163,7 +163,7 @@ jobs:
       - name: Update Homebrew formula
         run: |
           make update-homebrew-formula \
-            HOMEBREW_FORMULA_OUTPUT="homebrew-tap/Formula/apfel.rb" \
+            HOMEBREW_FORMULA_OUTPUT="homebrew-tap/Formula/apfel-plus.rb" \
             HOMEBREW_FORMULA_SHA256="${{ steps.asset.outputs.sha256 }}"
 
       - name: Push Homebrew tap update
@@ -171,11 +171,11 @@ jobs:
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          if git diff --quiet -- Formula/apfel.rb; then
+          if git diff --quiet -- Formula/apfel-plus.rb; then
             echo "Homebrew formula already up to date."
             exit 0
           fi
           version="${{ steps.version.outputs.value }}"
-          git add Formula/apfel.rb
-          git commit -m "apfel v$version"
+          git add Formula/apfel-plus.rb
+          git commit -m "apfel-plus v$version"
           git push origin HEAD:$TAP_BRANCH

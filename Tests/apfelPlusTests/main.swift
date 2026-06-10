@@ -1,5 +1,5 @@
-// apfel-tests — pure Swift test runner, no XCTest/Testing framework needed
-// Run: swift run apfel-tests
+// apfel-plus-tests — pure Swift test runner, no XCTest/Testing framework needed
+// Run: swift run apfel-plus-tests
 
 import Foundation
 import ApfelCLI

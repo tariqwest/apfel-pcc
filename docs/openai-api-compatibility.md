@@ -2,7 +2,7 @@
 
 **Base URL:** `http://localhost:11434/v1`
 
-`apfel` implements the OpenAI Chat Completions surface for Apple's on-device model. It is intended to be a drop-in local backend for SDKs and tools that can target a custom `base_url`.
+`apfel-plus` implements the OpenAI Chat Completions surface for Apple's on-device model. It is intended to be a drop-in local backend for SDKs and tools that can target a custom `base_url`.
 
 ## Supported Surface
 

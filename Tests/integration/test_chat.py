@@ -1,5 +1,5 @@
 """
-apfel Integration Tests -- Chat Mode (TUI)
+apfel-plus Integration Tests -- Chat Mode (TUI)
 
 Comprehensive tests for --chat in all scenarios:
 - Startup & exit (plain, quit, exit, EOF, non-TTY)
@@ -11,7 +11,7 @@ Comprehensive tests for --chat in all scenarios:
 - Chat multi-turn context
 
 Run: python3 -m pytest Tests/integration/test_chat.py -v
-Requires: release binary at .build/release/apfel
+Requires: release binary at .build/release/apfel-plus
 Some tests require Apple Intelligence enabled (skipped otherwise).
 """
 
@@ -30,7 +30,7 @@ import pytest
 
 
 ROOT = pathlib.Path(__file__).resolve().parents[2]
-BINARY = ROOT / ".build" / "release" / "apfel"
+BINARY = ROOT / ".build" / "release" / "apfel-plus"
 MCP_SERVER = ROOT / "mcp" / "calculator" / "server.py"
 ANSI_RE = re.compile(r"\x1b\[[0-9;]*m")
 
@@ -62,7 +62,7 @@ def run_cli(args, input_text=None, env=None, timeout=60):
 
 
 def run_chat_tty(args, steps, env=None, timeout=60, stop_when=None):
-    """Run apfel in a PTY, send interactive steps, collect all output."""
+    """Run apfel-plus in a PTY, send interactive steps, collect all output."""
     merged = _clean_env(env)
 
     with warnings.catch_warnings():
@@ -132,7 +132,7 @@ def run_chat_tty(args, steps, env=None, timeout=60, stop_when=None):
 
 
 def run_chat_json(args, steps, env=None, timeout=60, stop_when=None):
-    """Run apfel chat in a PTY with stdout separated from TTY output."""
+    """Run apfel-plus chat in a PTY with stdout separated from TTY output."""
     merged = _clean_env(env)
 
     stdout_read_fd, stdout_write_fd = os.pipe()

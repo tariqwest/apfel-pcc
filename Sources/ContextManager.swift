@@ -1,6 +1,6 @@
 // ============================================================================
 // ContextManager.swift — Convert OpenAI messages to LanguageModelSession
-// Part of apfel — Apple Intelligence from the command line
+// Part of apfel-plus — Apple Intelligence from the command line
 //
 // Uses FoundationModels Transcript API to reconstruct session state from
 // OpenAI's stateless message history — NO re-inference on history.

@@ -48,7 +48,7 @@ echo "Version: $version"
 
 # --- Unit tests ---
 step "Unit tests"
-swift run apfel-tests
+swift run apfel-plus-tests
 
 # --- Integration tests (ALL 7 suites, full qualification) ---
 step "Integration tests (full qualification)"
@@ -115,8 +115,8 @@ if [ -n "$prev_tag" ]; then
     notes+=$(git log --oneline "$prev_tag"..HEAD~1 -- | sed 's/^/- /')
 fi
 notes+=$'\n\n'"---"$'\n'
-notes+="Install: \`brew install apfel\`"$'\n'
-notes+="Upgrade: \`brew upgrade apfel\`"
+notes+="Install: \`brew install apfel-plus\`"$'\n'
+notes+="Upgrade: \`brew upgrade apfel-plus\`"
 
 if gh release view "v$version" --repo Arthur-Ficial/apfel >/dev/null 2>&1; then
     gh release upload "v$version" "$asset" --clobber --repo Arthur-Ficial/apfel
@@ -131,17 +131,17 @@ fi
 step "Update Homebrew tap"
 
 TAP_DIR=$(mktemp -d)
-git clone "https://x-access-token:$(gh auth token)@github.com/Arthur-Ficial/homebrew-tap.git" "$TAP_DIR" --quiet
+git clone "https://x-access-token:$(gh auth token)@github.com/tariqwest/homebrew-tap.git" "$TAP_DIR" --quiet
 
 make update-homebrew-formula \
-    HOMEBREW_FORMULA_OUTPUT="$TAP_DIR/Formula/apfel.rb" \
+    HOMEBREW_FORMULA_OUTPUT="$TAP_DIR/Formula/apfel-plus.rb" \
     HOMEBREW_FORMULA_SHA256="$sha256"
 
 cd "$TAP_DIR"
 git config user.name "Arthur Ficial"
 git config user.email "arti.ficial@fullstackoptimization.com"
-if ! git diff --quiet -- Formula/apfel.rb; then
-    git add Formula/apfel.rb
+if ! git diff --quiet -- Formula/apfel-plus.rb; then
+    git add Formula/apfel-plus.rb
     git commit -m "apfel v$version"
     git push origin main
     echo "Tap updated to v$version"

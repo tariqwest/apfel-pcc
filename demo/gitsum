@@ -1,12 +1,12 @@
 #!/bin/bash
 # gitsum — summarize recent git activity, powered by Apple Intelligence
-# Install globally as `apfel-gitsum`: see demo/README.md "Install demos globally (optional)"
+# Install globally as `apfel-plus-gitsum`: see demo/README.md "Install demos globally (optional)"
 #
 # Usage:  gitsum          # last 10 commits
 #         gitsum 20       # last 20 commits
 #         gitsum -c       # copy summary to clipboard
 #
-# Requires: apfel installed (https://github.com/Arthur-Ficial/apfel)
+# Requires: apfel-plus installed (https://github.com/tariqwest/apfel-plus)
 
 COPY=false
 COUNT=10
@@ -28,7 +28,7 @@ while [[ $# -gt 0 ]]; do
             echo "  gitsum 20     # last 20 commits"
             echo "  gitsum -c 5   # last 5, copy to clipboard"
             echo ""
-            echo "Requires: apfel (Apple Intelligence CLI)"
+            echo "Requires: apfel-plus (Apple Intelligence CLI)"
             exit 0
             ;;
         -*) echo "Unknown option: $1. Use --help."; exit 1 ;;
@@ -50,9 +50,9 @@ if ! git rev-parse --git-dir &>/dev/null 2>&1; then
     exit 1
 fi
 
-# Check apfel is installed
-if ! command -v apfel &>/dev/null; then
-    echo "Error: apfel not found. Install from https://github.com/Arthur-Ficial/apfel"
+# Check apfel-plus is installed
+if ! command -v apfel-plus &>/dev/null; then
+    echo "Error: apfel-plus not found. Install from https://github.com/tariqwest/apfel-plus"
     exit 1
 fi
 
@@ -73,11 +73,11 @@ Recent $COUNT commits:
 $log
 
 Authors:
-$authors" | apfel -q -s "$SYSTEM")
+$authors" | apfel-plus -q -s "$SYSTEM")
 status=$?
 
 if [[ $status -ne 0 ]]; then
-    echo "Error: apfel failed (exit $status)" >&2
+    echo "Error: apfel-plus failed (exit $status)" >&2
     exit $status
 fi
 

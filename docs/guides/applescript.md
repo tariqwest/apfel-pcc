@@ -7,8 +7,8 @@ Runnable scripts + tests: [Arthur-Ficial/apfel-guides-lab/scripts/applescript](h
 ## Prerequisites
 
 - macOS 26+ Tahoe, Apple Silicon, Apple Intelligence enabled
-- `brew install apfel jq`
-- `apfel --serve` running (port `11434`)
+- `brew install apfel-plus jq`
+- `apfel-plus --serve` running (port `11434`)
 - AppleScript (ships with macOS)
 
 AppleScript has no native HTTP client; the idiomatic pattern is `do shell script "curl ..."`.
@@ -75,7 +75,7 @@ Lab script: [`03_json.applescript`](https://github.com/Arthur-Ficial/apfel-guide
 ## 4. Error handling
 
 ```applescript
-set cmd to "tmp=$(mktemp); status=$(curl -sS -o \"$tmp\" -w '%{http_code}' http://localhost:11434/v1/embeddings -H 'Content-Type: application/json' -d '{\"model\":\"apple-foundationmodel\",\"input\":\"apfel runs 100% on-device.\"}'); if [ \"$status\" -ge 400 ]; then msg=$(jq -r '.error.message // empty' \"$tmp\" 2>/dev/null || true); echo \"Got expected error: HTTP $status - ${msg:-see response}\"; else echo \"unexpected success: HTTP $status\"; cat \"$tmp\"; fi; rm -f \"$tmp\""
+set cmd to "tmp=$(mktemp); status=$(curl -sS -o \"$tmp\" -w '%{http_code}' http://localhost:11434/v1/embeddings -H 'Content-Type: application/json' -d '{\"model\":\"apple-foundationmodel\",\"input\":\"apfel-plus runs 100% on-device.\"}'); if [ \"$status\" -ge 400 ]; then msg=$(jq -r '.error.message // empty' \"$tmp\" 2>/dev/null || true); echo \"Got expected error: HTTP $status - ${msg:-see response}\"; else echo \"unexpected success: HTTP $status\"; cat \"$tmp\"; fi; rm -f \"$tmp\""
 return do shell script cmd
 ```
 
@@ -135,13 +135,13 @@ Paste any of these into a **Run AppleScript** action in Shortcuts. Combine with 
 
 ## Troubleshooting
 
-- **Collapsed newlines** - `do shell script` returns a single AppleScript string with all newlines folded. That's a Classic macOS quirk, not an apfel issue.
+- **Collapsed newlines** - `do shell script` returns a single AppleScript string with all newlines folded. That's a Classic macOS quirk, not an apfel-plus issue.
 - **Stdin not flowing** - AppleScript cannot pipe its own stdin into `do shell script`. Pass file paths via `on run argv` instead.
 - **Escaping** - always use `quoted form of` for any user-supplied string before embedding in a shell command.
 
 ## Tested with
 
-- apfel v1.0.3 / macOS 26.3.1 Apple Silicon
+- apfel-plus v1.0.3 / macOS 26.3.1 Apple Silicon
 - osascript / AppleScript (system) / jq 1.7
 - Date: 2026-04-16
 

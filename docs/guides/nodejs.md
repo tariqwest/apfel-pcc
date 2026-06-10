@@ -1,14 +1,14 @@
 # How to use the Apple Foundation Model from Node.js
 
-Call Apple's on-device Foundation Model from Node.js using the official `openai` npm package, pointed at a local `apfel --serve`. 100% on-device, zero API cost.
+Call Apple's on-device Foundation Model from Node.js using the official `openai` npm package, pointed at a local `apfel-plus --serve`. 100% on-device, zero API cost.
 
 Runnable scripts + tests: [Arthur-Ficial/apfel-guides-lab/scripts/nodejs](https://github.com/Arthur-Ficial/apfel-guides-lab/tree/main/scripts/nodejs).
 
 ## Prerequisites
 
 - macOS 26+ Tahoe, Apple Silicon, Apple Intelligence enabled
-- `brew install apfel`
-- `apfel --serve` running (port `11434`)
+- `brew install apfel-plus`
+- `apfel-plus --serve` running (port `11434`)
 - Node.js 20+
 - `npm install openai`
 - `"type": "module"` in `package.json` (or use `.mjs` files)
@@ -116,7 +116,7 @@ const client = new OpenAI({ baseURL: "http://localhost:11434/v1", apiKey: "not-n
 try {
   await client.embeddings.create({
     model: "apple-foundationmodel",
-    input: "apfel runs 100% on-device.",
+    input: "apfel-plus runs 100% on-device.",
   });
 } catch (err) {
   if (err instanceof OpenAI.APIError) {
@@ -228,13 +228,13 @@ Lab script: [`06_example.mjs`](https://github.com/Arthur-Ficial/apfel-guides-lab
 
 ## Troubleshooting
 
-- **`ECONNREFUSED`** - start `apfel --serve` before running your Node script.
+- **`ECONNREFUSED`** - start `apfel-plus --serve` before running your Node script.
 - **Missing `choices[0]` during streaming** - handle the final usage chunk with the `if (!chunk.choices || chunk.choices.length === 0) continue;` guard above.
 - **TypeScript** - same code works; `npm install -D @types/node` for Node types.
 
 ## Tested with
 
-- apfel v1.0.3 / macOS 26.3.1 Apple Silicon
+- apfel-plus v1.0.3 / macOS 26.3.1 Apple Silicon
 - Node.js v25.8.1 / openai 4.x
 - Date: 2026-04-16
 

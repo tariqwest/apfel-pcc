@@ -1,15 +1,15 @@
 # MCP Tool Support
 
-apfel natively speaks the [https://modelcontextprotocol.io/](https://modelcontextprotocol.io/). Attach tool servers with `--mcp` and apfel discovers tools, executes them, and returns the final answer.
+apfel-plus natively speaks the [https://modelcontextprotocol.io/](https://modelcontextprotocol.io/). Attach tool servers with `--mcp` and apfel-plus discovers tools, executes them, and returns the final answer.
 
 All inference runs on-device with no network calls for the LLM itself. Optional remote MCP tool servers (`--mcp https://...`) do make network calls for tool arguments.
 
-> **Ready-made MCPs for apfel**: [apfel-mcp.franzai.com](https://apfel-mcp.franzai.com/) ships three token-budget-optimized MCP servers designed specifically for apfel's 4096-token context window: `url-fetch`, `ddg-search`, and the flagship compound `search-and-fetch` tool. Install with `brew install Arthur-Ficial/tap/apfel-mcp`. Repo is open for contributions of new apfel-optimized MCPs.
+> **Ready-made MCPs for apfel-plus**: [apfel-plus-mcp.franzai.com](https://apfel-plus-mcp.franzai.com/) ships three token-budget-optimized MCP servers designed specifically for apfel-plus's 4096-token context window: `url-fetch`, `ddg-search`, and the flagship compound `search-and-fetch` tool. Install with `brew install tariqwest/tap/apfel-plus-mcp`. Repo is open for contributions of new apfel-plus-optimized MCPs.
 
 ## Quick start
 
 ```bash
-apfel --mcp ./mcp/calculator/server.py "What is 15 times 27?"
+apfel-plus --mcp ./mcp/calculator/server.py "What is 15 times 27?"
 # mcp: ./mcp/calculator/server.py - add, subtract, multiply, divide, sqrt, power, round_number
 # tool: multiply({"a": 15, "b": 27}) = 405
 # 15 times 27 is 405.
@@ -21,39 +21,39 @@ No glue code. No manual round-trip. One command.
 
 ```bash
 # CLI - one command, answer out
-apfel --mcp ./mcp/calculator/server.py "What is 2 to the power of 10?"
+apfel-plus --mcp ./mcp/calculator/server.py "What is 2 to the power of 10?"
 
 # Server - tools auto-available to all clients
-apfel --serve --mcp ./mcp/calculator/server.py
+apfel-plus --serve --mcp ./mcp/calculator/server.py
 
 # Chat - tools persist across the conversation
-apfel --chat --mcp ./mcp/calculator/server.py
+apfel-plus --chat --mcp ./mcp/calculator/server.py
 
 # Multiple MCP servers
-apfel --mcp ./calc.py --mcp ./weather.py "What is sqrt(2025)?"
+apfel-plus --mcp ./calc.py --mcp ./weather.py "What is sqrt(2025)?"
 
 # Slow or remote MCP server - increase timeout (default: 5s, max: 300s)
-apfel --mcp-timeout 30 --mcp ./remote-server.py "hello"
+apfel-plus --mcp-timeout 30 --mcp ./remote-server.py "hello"
 
 # No --mcp = exactly as before. Zero overhead.
-apfel "Hello"
+apfel-plus "Hello"
 ```
 
 ### Persistent MCP registry (apfel-run)
 
-If you find yourself typing the same `--mcp` list every day, [Arthur-Ficial/apfel-run](https://github.com/Arthur-Ficial/apfel-run) (MIT, ~200 LOC) reads a plain text config at `~/.config/apfel/mcps.conf`, builds `APFEL_MCP` from the enabled lines, and `execve`s apfel. Comment out a line with `-` to disable, uncomment to re-enable.
+If you find yourself typing the same `--mcp` list every day, [Arthur-Ficial/apfel-run](https://github.com/Arthur-Ficial/apfel-run) (MIT, ~200 LOC) reads a plain text config at `~/.config/apfel-plus/mcps.conf`, builds `APFEL_MCP` from the enabled lines, and `execve`s apfel-plus. Comment out a line with `-` to disable, uncomment to re-enable.
 
 ```bash
-# ~/.config/apfel/mcps.conf
+# ~/.config/apfel-plus/mcps.conf
 /Users/me/mcp/calc.py
 /Users/me/mcp/web.py
 -/Users/me/mcp/filesystem.py   # disabled
 
-apfel-run "What is 15 times 27?"    # same as apfel + all enabled MCPs
+apfel-run "What is 15 times 27?"    # same as apfel-plus + all enabled MCPs
 apfel-run --list                    # see what's on / off
 ```
 
-This keeps apfel itself flag-only - the registry layer lives in its own 200-LOC wrapper.
+This keeps apfel-plus itself flag-only - the registry layer lives in its own 200-LOC wrapper.
 
 ## Remote MCP servers
 
@@ -61,17 +61,17 @@ Remote MCP uses Streamable HTTP transport (MCP spec `2025-03-26`):
 
 ```bash
 # Remote MCP server over HTTPS
-apfel --mcp https://mcp.example.com/v1 "what tools do you have?"
+apfel-plus --mcp https://mcp.example.com/v1 "what tools do you have?"
 
 # With bearer token auth - prefer the env var (flag is visible in ps aux)
-APFEL_MCP_TOKEN=mytoken apfel --mcp https://mcp.example.com/v1 "..."
-apfel --mcp https://mcp.example.com/v1 --mcp-token mytoken "..."
+APFEL_MCP_TOKEN=mytoken apfel-plus --mcp https://mcp.example.com/v1 "..."
+apfel-plus --mcp https://mcp.example.com/v1 --mcp-token mytoken "..."
 
 # Mixed local + remote
-apfel --mcp /path/to/local.py --mcp https://remote.example.com/v1 "..."
+apfel-plus --mcp /path/to/local.py --mcp https://remote.example.com/v1 "..."
 ```
 
-> **Security:** Prefer `APFEL_MCP_TOKEN` over `--mcp-token` because CLI flags are visible in `ps aux`. apfel refuses to send a bearer token over plaintext `http://`; use `https://`.
+> **Security:** Prefer `APFEL_MCP_TOKEN` over `--mcp-token` because CLI flags are visible in `ps aux`. apfel-plus refuses to send a bearer token over plaintext `http://`; use `https://`.
 
 ## Calculator tools
 
@@ -92,23 +92,23 @@ Ships at `mcp/calculator/server.py`. Zero dependencies (Python stdlib only).
 Five real round trips, unedited.
 
 ```
-$ apfel --mcp ./mcp/calculator/server.py "What is 15 times 27?"
+$ apfel-plus --mcp ./mcp/calculator/server.py "What is 15 times 27?"
 tool: multiply({"a": 15, "b": 27}) = 405
 15 times 27 is 405.
 
-$ apfel --mcp ./mcp/calculator/server.py "What is the square root of 2025?"
+$ apfel-plus --mcp ./mcp/calculator/server.py "What is the square root of 2025?"
 tool: sqrt({"number": 2025}) = 45
 The square root of 2025 is 45.
 
-$ apfel --mcp ./mcp/calculator/server.py "Divide 1000 by 7"
+$ apfel-plus --mcp ./mcp/calculator/server.py "Divide 1000 by 7"
 tool: divide({"numerator": 1000, "denominator": 7}) = 142.857...
 When you divide 1000 by 7, the result is approximately 142.857.
 
-$ apfel --mcp ./mcp/calculator/server.py "What is 2 to the power of 10?"
+$ apfel-plus --mcp ./mcp/calculator/server.py "What is 2 to the power of 10?"
 tool: power({"base": 2, "exponent": 10}) = 1024
 2 to the power of 10 is 1024.
 
-$ apfel --mcp ./mcp/calculator/server.py "Add 999 and 1"
+$ apfel-plus --mcp ./mcp/calculator/server.py "Add 999 and 1"
 tool: add({"a": 999, "b": 1}) = 1000
 The result of adding 999 and 1 is 1000.
 ```
@@ -118,7 +118,7 @@ Note: the model sends different argument key names each time (`a`/`b`, `number`,
 ## How it works
 
 ```
-apfel --mcp ./calc.py "What is 15 times 27?"
+apfel-plus --mcp ./calc.py "What is 15 times 27?"
   |
   v
 1. Spawn MCP server (stdio subprocess)
@@ -139,7 +139,7 @@ apfel --mcp ./calc.py "What is 15 times 27?"
 
 ## Server mode
 
-When running `apfel --serve --mcp ./calc.py`, the server auto-injects MCP tools for clients that don't send their own:
+When running `apfel-plus --serve --mcp ./calc.py`, the server auto-injects MCP tools for clients that don't send their own:
 
 - Client sends tools -> client's tools used, returned as `finish_reason: "tool_calls"` (standard OpenAI behavior, client handles execution)
 - Client sends NO tools -> MCP tools injected, server auto-executes tool calls and returns the final text answer with `finish_reason: "stop"`
@@ -204,7 +204,7 @@ while True:
 Then use it:
 
 ```bash
-apfel --mcp ./my-tool.py "question that needs the tool"
+apfel-plus --mcp ./my-tool.py "question that needs the tool"
 ```
 
 ## Tips for Apple's ~3B model
@@ -240,9 +240,9 @@ See `mcp/calculator/server.py` for a complete working example.
 
 ## Ready-made MCPs
 
-- [apfel-mcp.franzai.com](https://apfel-mcp.franzai.com/) - three token-budget-optimized MCP servers for apfel's 4096-token context window:
-  - `apfel-mcp-url-fetch` - fetch a URL, extract the main article with Readability, return clean Markdown. SSRF blocklist, 6000-char hard cap.
-  - `apfel-mcp-ddg-search` - DuckDuckGo web search via direct HTML scrape. No API key. 2000-char hard cap.
-  - `apfel-mcp-search-and-fetch` - the flagship compound tool. Searches AND fetches the top N result pages in ONE tool call. Saves ~500 tokens of schema/state overhead vs chaining separate tools. Declared as both `search` and `web_search` so the 3B model's hallucinated tool names still route correctly.
-  - Install with `brew install Arthur-Ficial/tap/apfel-mcp`
-  - Repo: [github.com/Arthur-Ficial/apfel-mcp](https://github.com/Arthur-Ficial/apfel-mcp) - open for contributions of new apfel-optimized MCPs. See [apfel-mcp.franzai.com/#contribute](https://apfel-mcp.franzai.com/#contribute) for the rules and idea list.
+- [apfel-plus-mcp.franzai.com](https://apfel-plus-mcp.franzai.com/) - three token-budget-optimized MCP servers for apfel-plus's 4096-token context window:
+  - `apfel-plus-mcp-url-fetch` - fetch a URL, extract the main article with Readability, return clean Markdown. SSRF blocklist, 6000-char hard cap.
+  - `apfel-plus-mcp-ddg-search` - DuckDuckGo web search via direct HTML scrape. No API key. 2000-char hard cap.
+  - `apfel-plus-mcp-search-and-fetch` - the flagship compound tool. Searches AND fetches the top N result pages in ONE tool call. Saves ~500 tokens of schema/state overhead vs chaining separate tools. Declared as both `search` and `web_search` so the 3B model's hallucinated tool names still route correctly.
+  - Install with `brew install tariqwest/tap/apfel-plus-mcp`
+  - Repo: [github.com/Arthur-Ficial/apfel-mcp](https://github.com/Arthur-Ficial/apfel-mcp) - open for contributions of new apfel-plus-optimized MCPs. See [apfel-plus-mcp.franzai.com/#contribute](https://apfel-plus-mcp.franzai.com/#contribute) for the rules and idea list.

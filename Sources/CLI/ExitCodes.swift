@@ -3,7 +3,7 @@
 // Part of ApfelCLI so the mapping is unit-testable; main.swift delegates here.
 //
 // Exit codes are a stable CLI contract documented in the man page. Changes
-// here must stay in sync with `apfel.1` and with the bidirectional-coverage
+// here must stay in sync with `apfel-plus.1` and with the bidirectional-coverage
 // integration test (`Tests/integration/test_man_page.py`).
 // ============================================================================
 

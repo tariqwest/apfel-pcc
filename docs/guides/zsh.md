@@ -7,8 +7,8 @@ Runnable scripts + tests: [Arthur-Ficial/apfel-guides-lab/scripts/zsh](https://g
 ## Prerequisites
 
 - macOS 26+ Tahoe (Zsh 5.9+ ships with the OS)
-- `brew install apfel jq`
-- `apfel --serve` running (port `11434`)
+- `brew install apfel-plus jq`
+- `apfel-plus --serve` running (port `11434`)
 
 ## 1. One-shot
 
@@ -121,7 +121,7 @@ local http_status
 http_status=$(curl -sS -o "$tmp" -w '%{http_code}' \
   http://localhost:11434/v1/embeddings \
   -H "Content-Type: application/json" \
-  -d '{"model":"apple-foundationmodel","input":"apfel runs 100% on-device."}')
+  -d '{"model":"apple-foundationmodel","input":"apfel-plus runs 100% on-device."}')
 
 if (( http_status >= 400 )); then
   local msg=$(jq -r '.error.message // empty' "$tmp" 2>/dev/null) || true
@@ -231,7 +231,7 @@ Lab script: [`06_example.zsh`](https://github.com/Arthur-Ficial/apfel-guides-lab
 
 ## Tested with
 
-- apfel v1.0.3 / macOS 26.3.1 Apple Silicon
+- apfel-plus v1.0.3 / macOS 26.3.1 Apple Silicon
 - zsh 5.9 (system) / jq 1.7
 - Date: 2026-04-16
 

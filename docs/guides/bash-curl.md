@@ -7,8 +7,8 @@ Perfect for CI pipelines, one-liners, and quick smoke tests. Runnable scripts + 
 ## Prerequisites
 
 - macOS 26+ Tahoe, Apple Silicon, Apple Intelligence enabled
-- `brew install apfel jq` (`curl` and `bash` already on every Mac)
-- `apfel --serve` running (port `11434`)
+- `brew install apfel-plus jq` (`curl` and `bash` already on every Mac)
+- `apfel-plus --serve` running (port `11434`)
 
 ## 1. One-shot
 
@@ -104,7 +104,7 @@ tmp=$(mktemp)
 http_status=$(curl -sS -o "$tmp" -w '%{http_code}' \
   http://localhost:11434/v1/embeddings \
   -H "Content-Type: application/json" \
-  -d '{"model":"apple-foundationmodel","input":"apfel runs 100% on-device."}')
+  -d '{"model":"apple-foundationmodel","input":"apfel-plus runs 100% on-device."}')
 
 if [[ "$http_status" -ge 400 ]]; then
   msg=$(jq -r '.error.message // empty' "$tmp" 2>/dev/null || true)
@@ -205,7 +205,7 @@ Lab script: [`06_example.sh`](https://github.com/Arthur-Ficial/apfel-guides-lab/
 
 ## Tested with
 
-- apfel v1.0.3 / macOS 26.3.1 Apple Silicon
+- apfel-plus v1.0.3 / macOS 26.3.1 Apple Silicon
 - Bash 5.3 / jq 1.7 / curl (system)
 - Date: 2026-04-16
 

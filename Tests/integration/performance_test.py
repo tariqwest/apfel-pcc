@@ -4,7 +4,7 @@ import subprocess
 
 
 ROOT = pathlib.Path(__file__).resolve().parents[2]
-BINARY = ROOT / ".build" / "release" / "apfel"
+BINARY = ROOT / ".build" / "release" / "apfel-plus"
 
 
 def test_benchmark_reports_real_speedups():

@@ -1,13 +1,13 @@
 #!/bin/bash
 # explain — explain a command, error, or code snippet, powered by Apple Intelligence
-# Install globally as `apfel-explain`: see demo/README.md "Install demos globally (optional)"
+# Install globally as `apfel-plus-explain`: see demo/README.md "Install demos globally (optional)"
 #
 # Usage:  explain "awk -F: '{print \$1,\$3}' /etc/passwd | sort -t' ' -k2 -n"
 #         pbpaste | explain          # explain clipboard contents
 #         echo "error: ..." | explain
 #         explain -c "xargs -I{}"   # copy explanation to clipboard
 #
-# Requires: apfel installed (https://github.com/Arthur-Ficial/apfel)
+# Requires: apfel-plus installed (https://github.com/tariqwest/apfel-plus)
 
 COPY=false
 
@@ -31,7 +31,7 @@ while [[ $# -gt 0 ]]; do
             echo "  pbpaste | explain"
             echo "  dmesg | tail -5 | explain"
             echo ""
-            echo "Requires: apfel (Apple Intelligence CLI)"
+            echo "Requires: apfel-plus (Apple Intelligence CLI)"
             exit 0
             ;;
         -*) echo "Unknown option: $1. Use --help."; exit 1 ;;
@@ -39,9 +39,9 @@ while [[ $# -gt 0 ]]; do
     esac
 done
 
-# Check apfel is installed
-if ! command -v apfel &>/dev/null; then
-    echo "Error: apfel not found. Install from https://github.com/Arthur-Ficial/apfel"
+# Check apfel-plus is installed
+if ! command -v apfel-plus &>/dev/null; then
+    echo "Error: apfel-plus not found. Install from https://github.com/tariqwest/apfel-plus"
     exit 1
 fi
 
@@ -62,11 +62,11 @@ input=$(echo "$input" | head -30)
 
 SYSTEM="Explain what this command, error, or code snippet does in 2-3 sentences. Be specific about each part. If it's an error, explain what caused it and how to fix it. No code fences, no bullet points — just plain sentences."
 
-result=$(echo "$input" | apfel -q -s "$SYSTEM")
+result=$(echo "$input" | apfel-plus -q -s "$SYSTEM")
 status=$?
 
 if [[ $status -ne 0 ]]; then
-    echo "Error: apfel failed (exit $status)" >&2
+    echo "Error: apfel-plus failed (exit $status)" >&2
     exit $status
 fi
 

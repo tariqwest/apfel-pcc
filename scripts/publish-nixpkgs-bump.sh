@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# publish-nixpkgs-bump.sh - open a nixpkgs PR bumping apfel-llm to the local .version.
+# publish-nixpkgs-bump.sh - open a nixpkgs PR bumping apfel-plus-llm to the local .version.
 #
 # Designed to run as the final, NON-FATAL step of `make release`. Also safe
 # to run standalone (e.g. for catch-up bumps) since it's idempotent at every
@@ -19,7 +19,7 @@ REPO_ROOT=$(cd "$(dirname "$0")/.." && pwd)
 NIXPKGS_DIR="${NIXPKGS_BUMP_DIR:-$HOME/dev/nixpkgs-bump}"
 UPSTREAM="NixOS/nixpkgs"
 FORK="Arthur-Ficial/nixpkgs"
-PACKAGE_PATH="pkgs/by-name/ap/apfel-llm/package.nix"
+PACKAGE_PATH="pkgs/by-name/ap/apfel-plus-llm/package.nix"
 
 version=""
 dry_run=false
@@ -136,21 +136,21 @@ if ! $dry_run; then
   fi
 
   # Advance a SINGLE bump PR instead of opening a new one per release. Find any
-  # open apfel-llm bump PR from our fork; reuse its branch (force-push updates
+  # open apfel-plus-llm bump PR from our fork; reuse its branch (force-push updates
   # that PR in place) and close any extras. Only when none exist do we open a
   # fresh PR on a stable branch. This stops the version-named-branch pileup that
   # left 1.3.5/1.3.6/1.3.7/1.3.8 all open at once.
-  open_prs=$(gh pr list --repo "$UPSTREAM" --state open --search "apfel-llm in:title" \
+  open_prs=$(gh pr list --repo "$UPSTREAM" --state open --search "apfel-plus-llm in:title" \
     --json number,headRefName,headRepositoryOwner \
     --jq '[.[] | select(.headRepositoryOwner.login=="Arthur-Ficial")]' 2>/dev/null || echo '[]')
 
   # Keep the newest, close the rest. The branch regex matches only bump branches
-  # (apfel-llm-bump or apfel-llm-<version>), so non-bump PRs such as
-  # apfel-llm-add-maintainer are never reused or closed by this flow.
+  # (apfel-plus-llm-bump or apfel-plus-llm-<version>), so non-bump PRs such as
+  # apfel-plus-llm-add-maintainer are never reused or closed by this flow.
   keep_number=""; keep_branch=""; dup_numbers=""
   { read -r keep_number; read -r keep_branch; read -r dup_numbers; } < <(
     printf '%s' "$open_prs" | python3 -c 'import json,re,sys
-prs=[p for p in json.load(sys.stdin) if re.match(r"^apfel-llm-(bump|[0-9])", p["headRefName"])]
+prs=[p for p in json.load(sys.stdin) if re.match(r"^apfel-plus-llm-(bump|[0-9])", p["headRefName"])]
 prs.sort(key=lambda p: p["number"])
 if prs:
     print(prs[-1]["number"]); print(prs[-1]["headRefName"])
@@ -162,7 +162,7 @@ else:
     branch="$keep_branch"
     info "Reusing open PR #$keep_number (branch $branch; old: $old_version, new: $version)..."
   else
-    branch="apfel-llm-bump"
+    branch="apfel-plus-llm-bump"
     info "No open bump PR - using stable branch $branch (old: $old_version, new: $version)..."
   fi
   git checkout -B "$branch" --quiet
@@ -177,7 +177,7 @@ else:
     exit 0
   fi
 
-  commit_msg="apfel-llm: ${old_version} -> ${version}"
+  commit_msg="apfel-plus-llm: ${old_version} -> ${version}"
   git add "$PACKAGE_PATH"
   git commit -m "$commit_msg" --quiet
   info "Pushing $branch to fork..."
@@ -185,7 +185,7 @@ else:
 
   # --- Open or update PR ---
   pr_title="$commit_msg"
-  pr_body="Bumps apfel-llm to ${version}.
+  pr_body="Bumps apfel-plus-llm to ${version}.
 
 Release: https://github.com/Arthur-Ficial/apfel/releases/tag/v${version}
 
@@ -206,13 +206,13 @@ This PR was opened automatically by \`scripts/publish-nixpkgs-bump.sh\` as a ste
   fi
   info "PR: $pr_url"
 
-  # Close any OTHER open apfel-llm bump PRs from our fork (dedup / self-heal).
+  # Close any OTHER open apfel-plus-llm bump PRs from our fork (dedup / self-heal).
   if [[ -n "$dup_numbers" ]]; then
     echo "$dup_numbers" | tr ',' '\n' | while read -r dup; do
       [[ -z "$dup" ]] && continue
       info "Closing superseded duplicate PR #$dup"
       gh pr close "$dup" --repo "$UPSTREAM" \
-        --comment "Superseded by #${keep_number}, which advances the apfel-llm bump to ${version}. Closing to keep a single open bump PR." >/dev/null 2>&1 || warn "could not close #$dup"
+        --comment "Superseded by #${keep_number}, which advances the apfel-plus-llm bump to ${version}. Closing to keep a single open bump PR." >/dev/null 2>&1 || warn "could not close #$dup"
     done
   fi
 else

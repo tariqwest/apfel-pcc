@@ -70,7 +70,7 @@ fi
 
 # --- Step 2: current versions in the two downstream channels.
 
-hb_raw=$(curl -sf "https://raw.githubusercontent.com/Homebrew/homebrew-core/master/Formula/a/apfel.rb" || true)
+hb_raw=$(curl -sf "https://raw.githubusercontent.com/Homebrew/homebrew-core/master/Formula/a/apfel-plus.rb" || true)
 if [[ -z "$hb_raw" ]]; then
   err "could not fetch homebrew-core formula"
   exit 2
@@ -85,7 +85,7 @@ if ! [[ "$hb_version" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
   exit 2
 fi
 
-nix_raw=$(curl -sf "https://raw.githubusercontent.com/NixOS/nixpkgs/master/pkgs/by-name/ap/apfel-llm/package.nix" || true)
+nix_raw=$(curl -sf "https://raw.githubusercontent.com/NixOS/nixpkgs/master/pkgs/by-name/ap/apfel-plus-llm/package.nix" || true)
 if [[ -z "$nix_raw" ]]; then
   err "could not fetch nixpkgs package.nix"
   exit 2
@@ -110,7 +110,7 @@ inflight_for() {
     --json title --jq "[.[] | select(.title | contains(\"$3\"))] | length" 2>/dev/null || echo 0
 }
 
-nix_inflight=$(inflight_for "NixOS/nixpkgs"        "apfel-llm" "$canonical")
+nix_inflight=$(inflight_for "NixOS/nixpkgs"        "apfel-plus-llm" "$canonical")
 hb_inflight=$( inflight_for "Homebrew/homebrew-core" "apfel"     "$canonical")
 
 # --- Step 4: decide which channels are lagging (mismatch + no in-flight cover).
@@ -156,14 +156,14 @@ Routine check this morning - looks like ${lagging_joined//,/ and } trailing v${c
 |---|---|---|---|
 | GitHub Releases | v${canonical} | - | - |
 | homebrew-core | v${hb_version} | v${canonical} | ~${hours_since}h |
-| nixpkgs \`apfel-llm\` | ${nix_version} | ${canonical} | ~${hours_since}h |
+| nixpkgs \`apfel-plus-llm\` | ${nix_version} | ${canonical} | ~${hours_since}h |
 
 ## Fixing it (for you, not me)
 
 **Homebrew-core:** normally autobumps within ~24h. If it is stuck, manually:
 
 \`\`\`bash
-brew bump-formula-pr apfel \\
+brew bump-formula-pr apfel-plus \\
   --url=https://github.com/Arthur-Ficial/apfel/releases/download/v${canonical}/apfel-${canonical}-arm64-macos.tar.gz
 \`\`\`
 

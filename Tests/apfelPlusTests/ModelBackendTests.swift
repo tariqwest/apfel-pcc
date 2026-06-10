@@ -30,8 +30,8 @@ func runModelBackendTests() {
         try assertEqual(ModelBackend.from(modelName: "default"), .onDevice)
     }
 
-    test("parse apfel -> onDevice") {
-        try assertEqual(ModelBackend.from(modelName: "apfel"), .onDevice)
+    test("parse apfel-plus -> onDevice") {
+        try assertEqual(ModelBackend.from(modelName: "apfel-plus"), .onDevice)
     }
 
     test("parse canonical on-device id -> onDevice") {
@@ -49,8 +49,8 @@ func runModelBackendTests() {
         try assertEqual(ModelBackend.from(modelName: "pcc"), .privateCloudCompute)
     }
 
-    test("parse apfel-pcc alias -> privateCloudCompute") {
-        try assertEqual(ModelBackend.from(modelName: "apfel-pcc"), .privateCloudCompute)
+    test("parse apfel-plus-pcc alias -> privateCloudCompute") {
+        try assertEqual(ModelBackend.from(modelName: "apfel-plus-pcc"), .privateCloudCompute)
     }
 
     test("parse canonical pcc id -> privateCloudCompute") {

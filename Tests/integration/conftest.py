@@ -9,7 +9,7 @@ import httpx
 import pytest
 
 ROOT = pathlib.Path(__file__).resolve().parents[2]
-BINARY = ROOT / ".build" / "release" / "apfel"
+BINARY = ROOT / ".build" / "release" / "apfel-plus"
 MCP_SERVER = ROOT / "mcp" / "calculator" / "server.py"
 OPENAI_SPEC = pathlib.Path(__file__).parent / "openai_spec" / "openapi.yaml"
 
@@ -43,7 +43,7 @@ def _server_alive(url: str) -> bool:
 
 
 def _start_server(port, extra_args=None):
-    """Start an apfel server on the given port. Returns the Popen object."""
+    """Start an apfel-plus server on the given port. Returns the Popen object."""
     cmd = [str(BINARY), "--serve", "--port", str(port)]
     if extra_args:
         cmd.extend(extra_args)
@@ -69,14 +69,14 @@ def _start_server(port, extra_args=None):
 
 @pytest.fixture(scope="session", autouse=True)
 def guard_server_11434():
-    """Start apfel server on port 11434 if not already running, skip if impossible."""
+    """Start apfel-plus server on port 11434 if not already running, skip if impossible."""
     if _server_alive("http://127.0.0.1:11434"):
         yield
         return
 
     proc = _start_server(11434)
     if proc is None:
-        pytest.skip("Could not start apfel server on port 11434")
+        pytest.skip("Could not start apfel-plus server on port 11434")
         return
 
     yield
@@ -91,14 +91,14 @@ def guard_server_11434():
 
 @pytest.fixture(scope="session", autouse=True)
 def guard_server_11435():
-    """Start apfel MCP server on port 11435 if not already running, skip if impossible."""
+    """Start apfel-plus MCP server on port 11435 if not already running, skip if impossible."""
     if _server_alive("http://127.0.0.1:11435"):
         yield
         return
 
     proc = _start_server(11435, ["--mcp", str(MCP_SERVER)])
     if proc is None:
-        pytest.skip("Could not start apfel MCP server on port 11435")
+        pytest.skip("Could not start apfel-plus MCP server on port 11435")
         return
 
     yield

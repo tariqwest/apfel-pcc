@@ -1,19 +1,19 @@
-# apfel Tool Calling Guide
+# apfel-plus Tool Calling Guide
 
 Real findings from systematic experimentation with Apple's on-device FoundationModels LLM
-and apfel's OpenAI-compatible tool calling implementation.
+and apfel-plus's OpenAI-compatible tool calling implementation.
 
-**Tested:** 2026-03-26 | **apfel:** v0.5.0 | **macOS:** 26.3
+**Tested:** 2026-03-26 | **apfel-plus:** v0.5.0 | **macOS:** 26.3
 
-> **Looking for ready-made MCPs?** [apfel-mcp.franzai.com](https://apfel-mcp.franzai.com/) ships three token-budget-optimized MCP servers designed for apfel's 4096-token context window: `url-fetch`, `ddg-search`, and the flagship compound `search-and-fetch` tool. `brew install Arthur-Ficial/tap/apfel-mcp`. The repo is open for contributions of new apfel-optimized MCPs - see [apfel-mcp.franzai.com/#contribute](https://apfel-mcp.franzai.com/#contribute).
+> **Looking for ready-made MCPs?** [apfel-plus-mcp.franzai.com](https://apfel-plus-mcp.franzai.com/) ships three token-budget-optimized MCP servers designed for apfel-plus's 4096-token context window: `url-fetch`, `ddg-search`, and the flagship compound `search-and-fetch` tool. `brew install tariqwest/tap/apfel-plus-mcp`. The repo is open for contributions of new apfel-plus-optimized MCPs - see [apfel-plus-mcp.franzai.com/#contribute](https://apfel-plus-mcp.franzai.com/#contribute).
 
-> **Managing many MCPs?** [Arthur-Ficial/apfel-run](https://github.com/Arthur-Ficial/apfel-run) is an MIT wrapper that keeps an enabled/disabled list in `~/.config/apfel/mcps.conf` (comment out with `-` to disable), builds `APFEL_MCP`, and `execve`s apfel. Stop typing `--mcp` on every call; edit the file instead.
+> **Managing many MCPs?** [Arthur-Ficial/apfel-run](https://github.com/Arthur-Ficial/apfel-run) is an MIT wrapper that keeps an enabled/disabled list in `~/.config/apfel-plus/mcps.conf` (comment out with `-` to disable), builds `APFEL_MCP`, and `execve`s apfel-plus. Stop typing `--mcp` on every call; edit the file instead.
 
 ---
 
 ## How It Works
 
-apfel converts OpenAI-format tool definitions into two paths:
+apfel-plus converts OpenAI-format tool definitions into two paths:
 
 1. **Native path:** Tool schemas are converted to `DynamicGenerationSchema` and passed
    via FoundationModels' `Transcript.ToolDefinition` API. The model outputs structured
@@ -21,7 +21,7 @@ apfel converts OpenAI-format tool definitions into two paths:
 
 2. **Fallback path:** If schema conversion fails (unsupported types), the tool definition
    is injected into the system prompt as text. The model is instructed to output a specific
-   JSON format, which apfel detects post-hoc via `ToolCallHandler.detectToolCall()`.
+   JSON format, which apfel-plus detects post-hoc via `ToolCallHandler.detectToolCall()`.
 
 Detection handles: clean JSON, markdown-wrapped ```` ```json ``` ```` blocks, and JSON
 after preamble text. Both paths produce identical OpenAI-compatible output.
@@ -220,7 +220,7 @@ User: "What is the weather in Vienna?"
 }
 ```
 
-**Result:** The model tried to call a tool, but it hallucinated a tool name (`addition` instead of `calculator`) with a made-up schema (`numbers` instead of `expression`). The JSON was also malformed (trailing `\"` inside the arguments string), so apfel's `detectToolCall()` couldn't parse it and it came back as raw `content` with `finish_reason: "stop"`. Note: `detectToolCall()` does NOT validate tool names against registered tools - it parses any valid `{"tool_calls": [...]}` JSON. The failure here was purely a JSON syntax error.
+**Result:** The model tried to call a tool, but it hallucinated a tool name (`addition` instead of `calculator`) with a made-up schema (`numbers` instead of `expression`). The JSON was also malformed (trailing `\"` inside the arguments string), so apfel-plus's `detectToolCall()` couldn't parse it and it came back as raw `content` with `finish_reason: "stop"`. Note: `detectToolCall()` does NOT validate tool names against registered tools - it parses any valid `{"tool_calls": [...]}` JSON. The failure here was purely a JSON syntax error.
 
 ---
 
@@ -281,7 +281,7 @@ User: "What is the weather in Vienna?"
 }
 ```
 
-**Result:** The model hallucinated a different tool name (`wikipedia.info` instead of `search`) and a different parameter name (`q` instead of `query`). The response also had malformed JSON (missing closing bracket), so `detectToolCall()` couldn't parse it. Note: even if the JSON had been valid, apfel would have accepted it - `detectToolCall()` does not validate tool names against registered tools. It would have returned `name: "wikipedia.info"` and the caller would need to handle the mismatch. The model sometimes "knows better" than your schema.
+**Result:** The model hallucinated a different tool name (`wikipedia.info` instead of `search`) and a different parameter name (`q` instead of `query`). The response also had malformed JSON (missing closing bracket), so `detectToolCall()` couldn't parse it. Note: even if the JSON had been valid, apfel-plus would have accepted it - `detectToolCall()` does not validate tool names against registered tools. It would have returned `name: "wikipedia.info"` and the caller would need to handle the mismatch. The model sometimes "knows better" than your schema.
 
 ---
 
@@ -484,7 +484,7 @@ data: {"usage":{"prompt_tokens":7,"completion_tokens":57,"total_tokens":64}}
 data: [DONE]
 ```
 
-**Result:** The raw tool call JSON streams as `content` deltas first (the model writes it as text). Then apfel detects the tool call pattern after the stream ends and emits a final chunk with the structured `delta.tool_calls`. Clients see the JSON as text, then get the clean tool call.
+**Result:** The raw tool call JSON streams as `content` deltas first (the model writes it as text). Then apfel-plus detects the tool call pattern after the stream ends and emits a final chunk with the structured `delta.tool_calls`. Clients see the JSON as text, then get the clean tool call.
 
 ---
 
@@ -591,7 +591,7 @@ Run 3: finish=tool_calls tool=get_weather({"city": "Munich", "country": "Germany
 Tool calling is server-only (no `--tools` CLI flag), but you can simulate it:
 
 ```bash
-apfel -s 'You have a tool get_weather(city). When asked about weather, respond ONLY with: {"tool_calls": [{"id": "call_1", "type": "function", "function": {"name": "get_weather", "arguments": "{\"city\": \"<city>\"}"}}]}' "Weather in London?"
+apfel-plus -s 'You have a tool get_weather(city). When asked about weather, respond ONLY with: {"tool_calls": [{"id": "call_1", "type": "function", "function": {"name": "get_weather", "arguments": "{\"city\": \"<city>\"}"}}]}' "Weather in London?"
 ```
 
 **Actual output:**
@@ -645,7 +645,7 @@ apfel -s 'You have a tool get_weather(city). When asked about weather, respond O
 | Hallucinated extra params | ~50% of calls | Adds `country` when only `city` requested |
 | Renamed params | ~20% of calls | Uses `topic` instead of schema's `query` |
 | Parallel tool calls | Never works | Can't call same tool twice in one response |
-| Hallucinated tool names | Occasional | Calls `wikipedia.info` instead of `search` (apfel accepts it - name validation is caller's job) |
+| Hallucinated tool names | Occasional | Calls `wikipedia.info` instead of `search` (apfel-plus accepts it - name validation is caller's job) |
 | Confused input/output | Rare | Puts output values as input arguments |
 | Guardrail false positives | Occasional | "Stock price" blocked |
 

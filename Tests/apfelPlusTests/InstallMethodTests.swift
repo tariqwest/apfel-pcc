@@ -1,7 +1,7 @@
 // ============================================================================
 // InstallMethodTests.swift — Coverage for path-based install method detection.
 //
-// Real filesystem test: lay down a synthetic <prefix>/bin/apfel layout in a
+// Real filesystem test: lay down a synthetic <prefix>/bin/apfel-plus layout in a
 // temp dir, then assert detection picks the right enum case. No mocking, no DI.
 // ============================================================================
 
@@ -10,17 +10,17 @@ import ApfelCLI
 
 func runInstallMethodTests() {
     test("Homebrew Cellar path -> .homebrew") {
-        let path = "/opt/homebrew/Cellar/apfel/1.3.5/bin/apfel"
+        let path = "/opt/homebrew/Cellar/apfel-plus/1.3.5/bin/apfel-plus"
         try assertEqual(detectInstallMethod(binaryPath: path), .homebrew)
     }
 
     test("Homebrew opt symlink path -> .homebrew") {
-        let path = "/opt/homebrew/opt/apfel/bin/apfel"
+        let path = "/opt/homebrew/opt/apfel-plus/bin/apfel-plus"
         try assertEqual(detectInstallMethod(binaryPath: path), .homebrew)
     }
 
     test("Intel Homebrew path -> .homebrew") {
-        let path = "/usr/local/homebrew/Cellar/apfel/1.3.5/bin/apfel"
+        let path = "/usr/local/homebrew/Cellar/apfel-plus/1.3.5/bin/apfel-plus"
         try assertEqual(detectInstallMethod(binaryPath: path), .homebrew)
     }
 
@@ -29,9 +29,9 @@ func runInstallMethodTests() {
         defer { try? FileManager.default.removeItem(at: tmp) }
         try FileManager.default.createDirectory(at: tmp.appendingPathComponent("bin"), withIntermediateDirectories: true)
         try FileManager.default.createDirectory(at: tmp.appendingPathComponent("var/macports"), withIntermediateDirectories: true)
-        FileManager.default.createFile(atPath: tmp.appendingPathComponent("bin/apfel").path, contents: nil)
+        FileManager.default.createFile(atPath: tmp.appendingPathComponent("bin/apfel-plus").path, contents: nil)
 
-        let result = detectInstallMethod(binaryPath: tmp.appendingPathComponent("bin/apfel").path)
+        let result = detectInstallMethod(binaryPath: tmp.appendingPathComponent("bin/apfel-plus").path)
         try assertEqual(result, .macports)
     }
 
@@ -41,9 +41,9 @@ func runInstallMethodTests() {
         let prefix = tmp.appendingPathComponent("opt/macports-custom")
         try FileManager.default.createDirectory(at: prefix.appendingPathComponent("bin"), withIntermediateDirectories: true)
         try FileManager.default.createDirectory(at: prefix.appendingPathComponent("var/macports"), withIntermediateDirectories: true)
-        FileManager.default.createFile(atPath: prefix.appendingPathComponent("bin/apfel").path, contents: nil)
+        FileManager.default.createFile(atPath: prefix.appendingPathComponent("bin/apfel-plus").path, contents: nil)
 
-        let result = detectInstallMethod(binaryPath: prefix.appendingPathComponent("bin/apfel").path)
+        let result = detectInstallMethod(binaryPath: prefix.appendingPathComponent("bin/apfel-plus").path)
         try assertEqual(result, .macports)
     }
 
@@ -54,17 +54,17 @@ func runInstallMethodTests() {
         try FileManager.default.createDirectory(at: tmp.appendingPathComponent("var"), withIntermediateDirectories: true)
         // var/macports as a regular file, not a directory — should NOT count as MacPorts
         FileManager.default.createFile(atPath: tmp.appendingPathComponent("var/macports").path, contents: nil)
-        FileManager.default.createFile(atPath: tmp.appendingPathComponent("bin/apfel").path, contents: nil)
+        FileManager.default.createFile(atPath: tmp.appendingPathComponent("bin/apfel-plus").path, contents: nil)
 
-        let result = detectInstallMethod(binaryPath: tmp.appendingPathComponent("bin/apfel").path)
+        let result = detectInstallMethod(binaryPath: tmp.appendingPathComponent("bin/apfel-plus").path)
         try assertEqual(result, .source)
     }
 
     test("Manual install at /usr/local/bin -> .source") {
         // Nothing on disk at /usr/local/var/macports, so this resolves to .source.
-        // (If a user happens to have MacPorts at /usr/local with apfel hand-installed
+        // (If a user happens to have MacPorts at /usr/local with apfel-plus hand-installed
         // there too, MacPorts wins — acceptable edge case.)
-        let result = detectInstallMethod(binaryPath: "/usr/local/bin/apfel")
+        let result = detectInstallMethod(binaryPath: "/usr/local/bin/apfel-plus")
         // Real filesystem on a dev machine has no /usr/local/var/macports — assert source.
         var isDir: ObjCBool = false
         let macportsExists = FileManager.default.fileExists(atPath: "/usr/local/var/macports", isDirectory: &isDir) && isDir.boolValue
@@ -79,16 +79,16 @@ func runInstallMethodTests() {
         let tmp = makeTempPrefix()
         defer { try? FileManager.default.removeItem(at: tmp) }
         try FileManager.default.createDirectory(at: tmp.appendingPathComponent("bin"), withIntermediateDirectories: true)
-        FileManager.default.createFile(atPath: tmp.appendingPathComponent("bin/apfel").path, contents: nil)
+        FileManager.default.createFile(atPath: tmp.appendingPathComponent("bin/apfel-plus").path, contents: nil)
 
-        let result = detectInstallMethod(binaryPath: tmp.appendingPathComponent("bin/apfel").path)
+        let result = detectInstallMethod(binaryPath: tmp.appendingPathComponent("bin/apfel-plus").path)
         try assertEqual(result, .source)
     }
 }
 
 private func makeTempPrefix() -> URL {
     let dir = FileManager.default.temporaryDirectory
-        .appendingPathComponent("apfel-install-method-\(UUID().uuidString)")
+        .appendingPathComponent("apfel-plus-install-method-\(UUID().uuidString)")
     try? FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
     return dir
 }

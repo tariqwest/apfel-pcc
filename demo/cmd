@@ -1,13 +1,13 @@
 #!/bin/bash
 # cmd — natural language to shell command, powered by Apple Intelligence
-# Install globally as `apfel-cmd`: see demo/README.md "Install demos globally (optional)"
+# Install globally as `apfel-plus-cmd`: see demo/README.md "Install demos globally (optional)"
 #
 # Usage:  cmd "find files larger than 100MB"
 #         cmd -x "list all open ports"       # execute (asks confirm)
 #         cmd -c "show disk usage sorted by size"   # copy to clipboard
 #
 # Shell function version (add to .zshrc):
-#   cmd(){ local x c r a; while [[ $1 == -* ]]; do case $1 in -x)x=1;shift;; -c)c=1;shift;; *)break;; esac; done; r=$(apfel -q -s 'Output only a shell command.' "$*" | sed '/^```/d;/^#/d;s/\x1b\[[0-9;]*[a-zA-Z]//g;s/^[[:space:]]*//;/^$/d' | head -1); [[ $r ]] || { echo "no command generated"; return 1; }; printf '\e[32m$\e[0m %s\n' "$r"; [[ $c ]] && printf %s "$r" | pbcopy && echo "(copied)"; [[ $x ]] && { printf 'Run? [y/N] '; read -r a; [[ $a == y ]] && eval "$r"; }; return 0; }
+#   cmd(){ local x c r a; while [[ $1 == -* ]]; do case $1 in -x)x=1;shift;; -c)c=1;shift;; *)break;; esac; done; r=$(apfel-plus -q -s 'Output only a shell command.' "$*" | sed '/^```/d;/^#/d;s/\x1b\[[0-9;]*[a-zA-Z]//g;s/^[[:space:]]*//;/^$/d' | head -1); [[ $r ]] || { echo "no command generated"; return 1; }; printf '\e[32m$\e[0m %s\n' "$r"; [[ $c ]] && printf %s "$r" | pbcopy && echo "(copied)"; [[ $x ]] && { printf 'Run? [y/N] '; read -r a; [[ $a == y ]] && eval "$r"; }; return 0; }
 #
 # Examples:
 #   cmd find all swift files larger than 1MB
@@ -21,7 +21,7 @@
 #   BAD:  cmd "kill all node processes"
 #   GOOD: cmd "stop all running node processes"
 #
-# Requires: apfel installed (https://github.com/Arthur-Ficial/apfel)
+# Requires: apfel-plus installed (https://github.com/tariqwest/apfel-plus)
 
 EXECUTE=false
 COPY=false
@@ -44,7 +44,7 @@ while [[ $# -gt 0 ]]; do
             echo "  cmd -x \"show disk usage sorted by size\""
             echo "  cmd -c \"awk to sum column 3 of a CSV\""
             echo ""
-            echo "Requires: apfel (Apple Intelligence CLI)"
+            echo "Requires: apfel-plus (Apple Intelligence CLI)"
             exit 0
             ;;
         -*) echo "Unknown option: $1. Use --help."; exit 1 ;;
@@ -58,19 +58,19 @@ if [[ -z "$1" ]]; then
     exit 1
 fi
 
-# Check apfel is installed
-if ! command -v apfel &>/dev/null; then
-    echo "Error: apfel not found. Install from https://github.com/Arthur-Ficial/apfel"
+# Check apfel-plus is installed
+if ! command -v apfel-plus &>/dev/null; then
+    echo "Error: apfel-plus not found. Install from https://github.com/tariqwest/apfel-plus"
     exit 1
 fi
 
 SYSTEM="You are a shell command generator for macOS (zsh/bash). Output ONLY the command — no explanation, no markdown, no code fences, no comments. If multiple commands are needed, join them with && or |. Never output anything except the command itself."
 
-result=$(apfel -q -s "$SYSTEM" "$1")
+result=$(apfel-plus -q -s "$SYSTEM" "$1")
 status=$?
 
 if [[ $status -ne 0 ]]; then
-    echo "Error: apfel failed (exit $status)" >&2
+    echo "Error: apfel-plus failed (exit $status)" >&2
     exit $status
 fi
 

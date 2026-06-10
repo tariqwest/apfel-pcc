@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 #
-# bump-nixpkgs.sh - update apfel-llm/package.nix version and hash.
+# bump-nixpkgs.sh - update apfel-plus-llm/package.nix version and hash.
 #
 # Does NOT touch git or gh; callers (GitHub Actions workflow, humans)
 # drive commit/push/PR separately. This keeps the script deterministic

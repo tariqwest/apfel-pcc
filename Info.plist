@@ -3,8 +3,8 @@
 <plist version="1.0">
 <dict>
     <key>CFBundleName</key>
-    <string>apfel</string>
+    <string>apfel-plus</string>
     <key>CFBundleIdentifier</key>
-    <string>com.arthurficial.apfel</string>
+    <string>com.tariqwest.apfel-plus</string>
 </dict>
 </plist>

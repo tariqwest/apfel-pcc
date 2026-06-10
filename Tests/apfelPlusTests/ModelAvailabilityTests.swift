@@ -79,9 +79,9 @@ func runModelAvailabilityTests() {
         try assertTrue(r.contains("M1"))
     }
 
-    test("remediation for .deviceNotEligible explains it is not an apfel limitation") {
+    test("remediation for .deviceNotEligible explains it is not an apfel-plus limitation") {
         let r = ModelAvailability.deviceNotEligible.remediation
-        try assertTrue(r.contains("not an apfel limitation"))
+        try assertTrue(r.contains("not an apfel-plus limitation"))
     }
 
     test("remediation for .modelNotReady mentions download") {
@@ -97,7 +97,7 @@ func runModelAvailabilityTests() {
 
     test("remediation for .unknownUnavailable tells user to file an issue") {
         let r = ModelAvailability.unknownUnavailable.remediation
-        try assertTrue(r.contains("github.com/Arthur-Ficial/apfel/issues"))
+        try assertTrue(r.contains("github.com/tariqwest/apfel-plus/issues"))
     }
 
     // -- Equatable --

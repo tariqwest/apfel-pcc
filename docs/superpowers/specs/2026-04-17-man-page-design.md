@@ -1,4 +1,4 @@
-# apfel(1) man page — design
+# apfel-plus(1) man page — design
 
 **Date:** 2026-04-17
 **Issue:** [#103](https://github.com/Arthur-Ficial/apfel/issues/103) — _Proposal: Create man page for apfel_
@@ -6,17 +6,17 @@
 
 ## Goal
 
-Ship a proper `apfel(1)` man page so `man apfel` works after any supported install (`brew install apfel`, `make install`, `nix profile install nixpkgs#apfel-ai`). The page must stay **in lockstep with `apfel --help`** — a flag change without a man-page change must break CI.
+Ship a proper `apfel-plus(1)` man page so `man apfel-plus` works after any supported install (`brew install apfel-plus`, `make install`, `nix profile install nixpkgs#apfel-plus-ai`). The page must stay **in lockstep with `apfel-plus --help`** — a flag change without a man-page change must break CI.
 
 ## Non-goals
 
 - Translating the man page. English only for now.
 - Generating from `--help` text. Our help is prose; a man page deserves more structure (`ENVIRONMENT`, `EXIT STATUS`, `FILES`, `SEE ALSO`) and richer wording than `--help` carries.
-- Shipping `apfel-completions(1)` or multi-page `man` sets. Single page only.
+- Shipping `apfel-plus-completions(1)` or multi-page `man` sets. Single page only.
 
 ## Decisions
 
-### 1. Hand-written troff source at `man/apfel.1.in`
+### 1. Hand-written troff source at `man/apfel-plus.1.in`
 
 A versioned troff template with a single placeholder `@VERSION@`. No pandoc dependency at release time, no markdown build step, diffs are human-readable in PRs.
 
@@ -27,30 +27,30 @@ Rejected alternatives:
 
 ### 2. Version injection via Makefile
 
-New target `generate-man-page` substitutes `@VERSION@` from `.version` and writes `.build/release/apfel.1`. Flow mirrors `generate-build-info`.
+New target `generate-man-page` substitutes `@VERSION@` from `.version` and writes `.build/release/apfel-plus.1`. Flow mirrors `generate-build-info`.
 
 ### 3. Install wiring
 
-- `make install` copies `apfel.1` to `$(PREFIX)/share/man/man1/apfel.1`.
+- `make install` copies `apfel-plus.1` to `$(PREFIX)/share/man/man1/apfel-plus.1`.
 - `make uninstall` removes it.
-- `make package-release-asset` now writes a tarball with `apfel` + `apfel.1` at its root (layout: `apfel-<v>-arm64-macos.tar.gz` → contains `apfel`, `apfel.1`).
-- `scripts/write-homebrew-formula.sh` emits `man1.install "apfel.1"` alongside the existing `bin.install "apfel"`.
+- `make package-release-asset` now writes a tarball with `apfel-plus` + `apfel-plus.1` at its root (layout: `apfel-plus-<v>-arm64-macos.tar.gz` → contains `apfel-plus`, `apfel-plus.1`).
+- `scripts/write-homebrew-formula.sh` emits `man1.install "apfel-plus.1"` alongside the existing `bin.install "apfel-plus"`.
 - nixpkgs: no change on our side — the nixpkgs derivation installs any `share/man/man1/*.1` automatically when present in the tarball.
 
 ### 4. Drift prevention (the automation the user asked for)
 
 A single integration test, `Tests/integration/test_man_page.py`, enforces:
 
-1. `apfel.1` passes `mandoc -Tlint -W warning,stop` with zero warnings.
-2. `man -l apfel.1` renders without error.
-3. **Bidirectional flag coverage.** Every flag in `apfel --help` appears in the man page `OPTIONS`/`CONTEXT OPTIONS`/`SERVER OPTIONS` sections; every flag in those sections appears in `apfel --help`. Added, removed, or renamed flags _must_ touch both files or the test fails.
-4. **Bidirectional environment coverage.** Same check for `ENVIRONMENT` section ↔ `apfel --help` `ENVIRONMENT` block.
+1. `apfel-plus.1` passes `mandoc -Tlint -W warning,stop` with zero warnings.
+2. `man -l apfel-plus.1` renders without error.
+3. **Bidirectional flag coverage.** Every flag in `apfel-plus --help` appears in the man page `OPTIONS`/`CONTEXT OPTIONS`/`SERVER OPTIONS` sections; every flag in those sections appears in `apfel-plus --help`. Added, removed, or renamed flags _must_ touch both files or the test fails.
+4. **Bidirectional environment coverage.** Same check for `ENVIRONMENT` section ↔ `apfel-plus --help` `ENVIRONMENT` block.
 5. **Exit-status coverage.** Every exit code in `main.swift` is listed in the man-page `EXIT STATUS` section.
 6. Version in the man page header matches `.version`.
 
 This test runs in three places:
 
-- `swift run apfel-tests` + `python3 -m pytest Tests/integration/test_man_page.py` during local dev.
+- `swift run apfel-plus-tests` + `python3 -m pytest Tests/integration/test_man_page.py` during local dev.
 - GitHub CI (`ci.yml`) on every push and PR — blocks merge.
 - `make preflight` — blocks every release.
 
@@ -78,12 +78,12 @@ AUTHORS
 
 ## Testing
 
-- **Unit** (`Tests/apfelTests/ManPageTests.swift`):
-  - `man/apfel.1.in` exists and is non-empty.
+- **Unit** (`Tests/apfelPlusTests/ManPageTests.swift`):
+  - `man/apfel-plus.1.in` exists and is non-empty.
   - Contains all required section headers.
   - `@VERSION@` placeholder present exactly once, inside `.TH`.
   - No stray `@.*@` placeholders besides `@VERSION@`.
-- **Integration** (`Tests/integration/test_man_page.py`): the six drift checks above, run against the generated `.build/release/apfel.1`.
+- **Integration** (`Tests/integration/test_man_page.py`): the six drift checks above, run against the generated `.build/release/apfel-plus.1`.
 
 ## Rollout
 

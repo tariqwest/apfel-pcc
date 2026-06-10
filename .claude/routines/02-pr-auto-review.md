@@ -53,7 +53,7 @@ You are the first-responder reviewer for a new or updated pull request on `Arthu
 
 8. **Test coverage check.** Per CLAUDE.md section 7:
    - New flag → CLI argument tests (happy path + validation errors)
-   - New public `ApfelCore` API → unit test in `Tests/apfelTests/*Tests.swift`
+   - New public `ApfelCore` API → unit test in `Tests/apfelPlusTests/*Tests.swift`
    - New network surface → integration test in `Tests/integration/` using the conftest pattern (not a standalone manual script)
    - Error tests use the tightened `catch let e as CLIParseError { assertTrue(e.message.contains("...")) }` style
 
