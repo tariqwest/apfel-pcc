@@ -74,7 +74,7 @@ func makeGenerationOptions(_ opts: SessionOptions) -> GenerationOptions {
         seed: opts.seed
     )
     return GenerationOptions(
-        sampling: makeSamplingMode(decision),
+        samplingMode: makeSamplingMode(decision),
         temperature: opts.temperature,
         maximumResponseTokens: opts.maxTokens
     )
