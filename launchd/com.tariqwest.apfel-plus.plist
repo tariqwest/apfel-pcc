@@ -1,0 +1,76 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <!--
+        apfel-plus LaunchAgent - serves the OpenAI-compatible HTTP API on
+        apfel.localhost:1337 for the logged-in user. Runs at login,
+        restarts on crash, logs stdout/stderr under ~/Library/Logs.
+
+        Why an Agent and not a Daemon: FoundationModels / Apple Intelligence
+        require the user's GUI session to be active. A LaunchDaemon runs as
+        root with no user session and cannot reach the on-device model.
+
+        Manage with:
+          launchctl bootstrap gui/$UID ~/Library/LaunchAgents/com.tariqwest.apfel-plus.plist
+          launchctl bootout   gui/$UID/com.tariqwest.apfel-plus
+          launchctl kickstart -k gui/$UID/com.tariqwest.apfel-plus
+          launchctl print     gui/$UID/com.tariqwest.apfel-plus
+    -->
+    <key>Label</key>
+    <string>com.tariqwest.apfel-plus</string>
+
+    <key>ProgramArguments</key>
+    <array>
+        <string>/usr/local/bin/apfel-plus</string>
+        <string>--serve</string>
+        <string>--port</string>
+        <string>1337</string>
+        <string>--host</string>
+        <string>apfel.localhost</string>
+        <string>--token</string>
+        <string>sk-apfel</string>
+        <string>--debug</string>
+    </array>
+
+    <!-- Start at login -->
+    <key>RunAtLoad</key>
+    <true/>
+
+    <!-- Restart on crash / non-zero exit.
+         SuccessfulExit=false means "only restart when the process exited
+         abnormally" - launchd will not respawn after a clean shutdown. -->
+    <key>KeepAlive</key>
+    <dict>
+        <key>SuccessfulExit</key>
+        <false/>
+        <key>Crashed</key>
+        <true/>
+    </dict>
+
+    <!-- Throttle respawns so a crash loop doesn't peg the CPU.
+         launchd's documented minimum is 10s; we use 5s which it will clamp. -->
+    <key>ThrottleInterval</key>
+    <integer>10</integer>
+
+    <!-- Don't run if any of these conditions is unhealthy (no AC power
+         requirements - the model runs on-battery fine). -->
+    <key>ProcessType</key>
+    <string>Interactive</string>
+
+    <!-- Logs (rotation is the user's responsibility; see `man newsyslog`). -->
+    <key>StandardOutPath</key>
+    <string>/Users/tariqwest/Library/Logs/apfel-plus.out.log</string>
+    <key>StandardErrorPath</key>
+    <string>/Users/tariqwest/Library/Logs/apfel-plus.err.log</string>
+
+    <key>WorkingDirectory</key>
+    <string>/Users/tariqwest</string>
+
+    <key>EnvironmentVariables</key>
+    <dict>
+        <key>PATH</key>
+        <string>/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin</string>
+    </dict>
+</dict>
+</plist>
