@@ -22,6 +22,7 @@ public struct CLIArguments: Sendable, Equatable {
         case benchmark
         case modelInfo = "model-info"
         case update
+        case autostart
         case help
         case version
         case release
@@ -289,6 +290,10 @@ extension CLIArguments {
             case "--update":
                 context.modeFlagsSeen.append("--update")
                 result.mode = .update
+
+            case "--autostart":
+                context.modeFlagsSeen.append("--autostart")
+                result.mode = .autostart
 
             // -- Server --
 

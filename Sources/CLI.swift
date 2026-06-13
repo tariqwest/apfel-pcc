@@ -461,6 +461,9 @@ func printUsage() {
           --model-info           Print model capabilities and exit
           --benchmark            Run internal performance benchmarks
           --update               Check for updates and upgrade via Homebrew
+          --autostart            Install a LaunchAgent so the server starts at login
+                                 and respawns on crash. Captures any --serve flags
+                                 passed alongside (e.g. --port, --host, --token).
           --debug                Enable debug logging to stderr (all modes)
       -h, --help                Show this help
       -v, --version             Print version

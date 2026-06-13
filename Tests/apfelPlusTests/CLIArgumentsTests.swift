@@ -570,6 +570,39 @@ func runCLIArgumentsTests() {
     }
 
     // ========================================================================
+    // MARK: - Autostart mode
+    // ========================================================================
+
+    test("--autostart sets autostart mode") {
+        let args = try CLIArguments.parse(["--autostart"])
+        try assertEqual(args.mode, .autostart)
+    }
+
+    test("--autostart picks up companion --serve flags for the agent's invocation") {
+        // --autostart is a sibling of --serve at the mode level: it doesn't
+        // run the server itself, but it captures the user's intended --serve
+        // configuration to embed in the LaunchAgent plist.
+        let args = try CLIArguments.parse([
+            "--autostart", "--port", "1337", "--host", "apfel.localhost",
+            "--token", "sk-xyz", "--debug"
+        ])
+        try assertEqual(args.mode, .autostart)
+        try assertEqual(args.serverPort, 1337)
+        try assertEqual(args.serverHost, "apfel.localhost")
+        try assertEqual(args.serverToken, "sk-xyz")
+        try assertTrue(args.debug)
+    }
+
+    test("--autostart conflicts with another mode flag") {
+        do {
+            _ = try CLIArguments.parse(["--autostart", "--chat"])
+            throw TestFailure("expected mode conflict")
+        } catch let e as CLIParseError {
+            try assertTrue(e.message.contains("--autostart") || e.message.contains("--chat"))
+        }
+    }
+
+    // ========================================================================
     // MARK: - Backend flags
     // ========================================================================
 

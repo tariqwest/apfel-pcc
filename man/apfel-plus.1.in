@@ -174,6 +174,25 @@ Run the internal performance benchmark suite.
 .B \-\-update
 Check for updates and, if available, upgrade via Homebrew.
 .TP
+.B \-\-autostart
+Install a per-user
+.B launchd
+LaunchAgent so the OpenAI-compatible HTTP server starts at login and
+respawns on abnormal termination. Captures any
+.B \-\-serve
+flags passed alongside (for example
+.BR \-\-port ", " \-\-host ", " \-\-token ", " \-\-cors )
+and embeds them in the plist as the agent's invocation. Writes
+.IR ~/Library/LaunchAgents/com.apfel-plus.serve.plist ,
+logs to
+.IR ~/Library/Logs/apfel-plus.{out,err}.log ,
+and registers the agent with
+.B launchctl bootstrap gui/$UID.
+Re-run to refresh the configuration; use
+.B launchctl bootout gui/$UID/com.apfel-plus.serve
+to remove. A LaunchAgent (not a LaunchDaemon) is used because
+Apple Intelligence is only accessible from the logged-in user's GUI session.
+.TP
 .B \-\-debug
 Enable verbose debug logging to standard error in every mode.
 .TP

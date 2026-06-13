@@ -409,6 +409,31 @@ func runApfelCorePublicAPIUsageTests() {
         try assertEqual(ModelBackend.from(modelName: "pcc"), .privateCloudCompute)
     }
 
+    // MARK: - AutostartPlist
+
+    test("AutostartPlist public surface compiles") {
+        let plist = AutostartPlist(
+            label: AutostartPlist.defaultLabel,
+            binaryPath: "/usr/local/bin/apfel-plus",
+            arguments: ["--serve"],
+            stdoutPath: AutostartPlist.defaultStdoutPath(homeDirectory: "/Users/x"),
+            stderrPath: AutostartPlist.defaultStderrPath(homeDirectory: "/Users/x"),
+            workingDirectory: "/Users/x"
+        )
+        let _: String = plist.label
+        let _: String = plist.binaryPath
+        let _: [String] = plist.arguments
+        let _: String = plist.stdoutPath
+        let _: String = plist.stderrPath
+        let _: String = plist.workingDirectory
+        let _: String = plist.render()
+        let _: String = AutostartPlist.defaultLabel
+        let _: String = AutostartPlist.defaultInstallPath(homeDirectory: "/Users/x")
+        let _ = requireSendable(plist)
+        try assertEqual(plist, plist)  // Equatable
+        let _: Set<AutostartPlist> = [plist] // Hashable
+    }
+
     // MARK: - OriginValidator
 
     test("OriginValidator public surface compiles") {

@@ -183,7 +183,7 @@ let serverAllowedOrigins: [String] = {
 // errors there surface through ApfelError.classify rather than re-implementing
 // the check.
 switch parsed.mode {
-case .modelInfo, .serve, .update:
+case .modelInfo, .serve, .update, .autostart:
     break
 default:
     if parsed.backend == .onDevice {
@@ -238,6 +238,9 @@ do {
 
     case .update:
         performUpdate()
+
+    case .autostart:
+        try performAutostart(parsed: parsed)
 
     case .modelInfo:
         await printModelInfo()

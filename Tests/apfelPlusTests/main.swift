@@ -88,6 +88,7 @@ suite("BufferedLineReaderTests") { runBufferedLineReaderTests() }
 suite("CLIArgumentsTests") { runCLIArgumentsTests() }
 suite("ModelAvailabilityTests") { runModelAvailabilityTests() }
 suite("ModelBackendTests") { runModelBackendTests() }
+suite("AutostartPlistTests") { runAutostartPlistTests() }
 suite("CLIErrorsTests") { runCLIErrorsTests() }
 suite("CLIValidateTests") { runCLIValidateTests() }
 suite("SchemaParserTests") { runSchemaParserTests() }
