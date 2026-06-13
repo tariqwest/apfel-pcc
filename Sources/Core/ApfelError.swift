@@ -11,6 +11,16 @@ public enum ApfelError: Error, Equatable, Hashable, Sendable {
     case decodingFailure(String)
     case unsupportedLanguage(String)
     case toolExecution(String)
+    /// Apple Private Cloud Compute is not available on this device right now.
+    /// Carries the reason ("deviceNotEligible", "systemNotReady", or the raw
+    /// localized description if the framework returned a case we don't
+    /// recognise) so the response message is specific.
+    case pccUnavailable(String)
+    /// PCC quota for this Apple Account has been reached. Reset is per-account
+    /// and time-based; users should retry later.
+    case pccQuotaExceeded
+    /// PCC could not reach the server (transient network failure).
+    case pccNetworkFailure(String)
     case unknown(String)
 
     /// Classify any thrown error into a typed ApfelError.
@@ -24,6 +34,13 @@ public enum ApfelError: Error, Equatable, Hashable, Sendable {
 
         let typeName = String(describing: type(of: error))
         let mirror = String(reflecting: error)
+        if let pccError = classifyPCCError(
+            typeName: typeName,
+            mirror: mirror,
+            localizedDescription: error.localizedDescription
+        ) {
+            return pccError
+        }
         if let generationError = classifyGenerationError(
             typeName: typeName,
             mirror: mirror,
@@ -33,6 +50,30 @@ public enum ApfelError: Error, Equatable, Hashable, Sendable {
         }
 
         return classifyLocalizedDescription(error.localizedDescription)
+    }
+
+    /// Match `FoundationModels.PrivateCloudComputeLanguageModel.Error` cases
+    /// (networkFailure / quotaLimitReached / serviceUnavailable) without
+    /// importing FoundationModels into ApfelCore. Mirrors the
+    /// classifyGenerationError approach.
+    private static func classifyPCCError(
+        typeName: String,
+        mirror: String,
+        localizedDescription: String
+    ) -> ApfelError? {
+        guard typeName.contains("PrivateCloudCompute") || mirror.contains("PrivateCloudCompute") else {
+            return nil
+        }
+        if mirror.contains("quotaLimitReached") {
+            return .pccQuotaExceeded
+        }
+        if mirror.contains("networkFailure") {
+            return .pccNetworkFailure(localizedDescription)
+        }
+        if mirror.contains("serviceUnavailable") {
+            return .pccUnavailable("serviceUnavailable")
+        }
+        return .pccUnavailable(localizedDescription)
     }
 
     private static func classifyGenerationError(
@@ -89,6 +130,9 @@ public enum ApfelError: Error, Equatable, Hashable, Sendable {
         case .decodingFailure:     return "[decoding failure]"
         case .unsupportedLanguage: return "[unsupported language]"
         case .toolExecution:       return "[tool error]"
+        case .pccUnavailable:      return "[pcc unavailable]"
+        case .pccQuotaExceeded:    return "[pcc quota]"
+        case .pccNetworkFailure:   return "[pcc network]"
         case .unknown:             return "[error]"
         }
     }
@@ -105,6 +149,9 @@ public enum ApfelError: Error, Equatable, Hashable, Sendable {
         case .decodingFailure:     return "server_error"
         case .unsupportedLanguage: return "invalid_request_error"
         case .toolExecution:       return "server_error"
+        case .pccUnavailable:      return "server_error"
+        case .pccQuotaExceeded:    return "rate_limit_error"
+        case .pccNetworkFailure:   return "server_error"
         case .unknown:             return "server_error"
         }
     }
@@ -127,6 +174,9 @@ public enum ApfelError: Error, Equatable, Hashable, Sendable {
         case .decodingFailure:     return 500
         case .unsupportedLanguage: return 400
         case .toolExecution:       return 500
+        case .pccUnavailable:      return 503
+        case .pccQuotaExceeded:    return 429
+        case .pccNetworkFailure:   return 503
         case .unknown:             return 500
         }
     }
@@ -153,6 +203,12 @@ public enum ApfelError: Error, Equatable, Hashable, Sendable {
             return "Unsupported language: \(msg)"
         case .toolExecution(let msg):
             return msg
+        case .pccUnavailable(let reason):
+            return "Apple Private Cloud Compute is not available on this device (\(reason)). PCC requires macOS 27+, Apple Intelligence enabled, and an eligible device. Try the on-device model (`apple-foundationmodel`) instead."
+        case .pccQuotaExceeded:
+            return "Apple Private Cloud Compute quota for this Apple Account has been reached. Retry later or fall back to the on-device model."
+        case .pccNetworkFailure(let msg):
+            return "Apple Private Cloud Compute could not be reached: \(msg). Check your network and retry, or use the on-device model."
         case .unknown(let msg):
             return msg
         }
@@ -162,7 +218,7 @@ public enum ApfelError: Error, Equatable, Hashable, Sendable {
     /// Uses typed matching (locale-independent) — safe on any macOS language.
     public var isRetryable: Bool {
         switch self {
-        case .rateLimited, .concurrentRequest, .assetsUnavailable:
+        case .rateLimited, .concurrentRequest, .assetsUnavailable, .pccNetworkFailure:
             return true
         default:
             return false
@@ -242,6 +298,12 @@ extension ApfelError: LocalizedError, CustomStringConvertible, CustomDebugString
             return "ApfelError.unsupportedLanguage(\(String(reflecting: message)))"
         case .toolExecution(let message):
             return "ApfelError.toolExecution(\(String(reflecting: message)))"
+        case .pccUnavailable(let reason):
+            return "ApfelError.pccUnavailable(\(String(reflecting: reason)))"
+        case .pccQuotaExceeded:
+            return "ApfelError.pccQuotaExceeded"
+        case .pccNetworkFailure(let message):
+            return "ApfelError.pccNetworkFailure(\(String(reflecting: message)))"
         case .unknown(let message):
             return "ApfelError.unknown(\(String(reflecting: message)))"
         }

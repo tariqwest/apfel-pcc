@@ -34,6 +34,9 @@ public enum ApfelExitCodes {
         case .decodingFailure:     return runtimeError
         case .unsupportedLanguage: return runtimeError
         case .toolExecution:       return runtimeError
+        case .pccUnavailable:      return modelUnavailable
+        case .pccQuotaExceeded:    return rateLimited
+        case .pccNetworkFailure:   return runtimeError
         case .unknown:             return runtimeError
         }
     }

@@ -108,11 +108,30 @@ func handleChatCompletion(_ request: Request, context: some RequestContext) asyn
     )
 
     // Per-request backend routing: clients opt into PCC by setting
-    // `model: "apple-foundationmodel-pcc"` (or the `pcc` / `apfel-plus-pcc`
-    // aliases). Anything else stays on-device. Unknown ids fall through to
-    // the on-device default so OpenAI clients that hard-code e.g. `gpt-4`
-    // keep working.
+    // `model: "apple-foundationmodel-pcc"` (or the `pcc` / `apfel-pcc`
+    // aliases). The `ChatRequestValidator` already rejected anything outside
+    // the accepted-model set, so by this point we only see ids that parse to
+    // a real backend.
     let backend = ModelBackend.from(modelName: chatRequest.model)
+
+    // PCC pre-flight: surface deviceNotEligible / systemNotReady as a typed
+    // 503 with a clear message instead of letting the framework throw an
+    // opaque LanguageModelError -1 inside session.respond.
+    do {
+        try assertBackendAvailable(backend)
+    } catch {
+        let classified = ApfelError.classify(error)
+        let msg = classified.openAIMessage
+        return chatFailure(
+            status: .init(code: classified.httpStatusCode),
+            message: msg,
+            type: classified.openAIType,
+            stream: isStreaming,
+            requestBody: requestBodyString,
+            events: events,
+            event: "backend unavailable: \(classified.cliLabel) \(msg)"
+        )
+    }
 
     // Build session options from request (retry config comes from server config)
     let sessionOpts = SessionOptions(
@@ -146,7 +165,7 @@ func handleChatCompletion(_ request: Request, context: some RequestContext) asyn
             toolChoice: chatRequest.tool_choice
         )
     } catch {
-        let classified = ApfelError.classify(error)
+        let classified = reclassifyForBackend(ApfelError.classify(error), backend: backend)
         let msg = classified.openAIMessage
         return chatFailure(
             status: .init(code: classified.httpStatusCode),
@@ -191,13 +210,16 @@ func handleChatCompletion(_ request: Request, context: some RequestContext) asyn
                 session: session, prompt: finalPrompt, schema: schema,
                 id: requestId, created: created, genOpts: genOpts,
                 promptTokens: promptTokens, includeUsage: includeUsage,
+                backend: backend,
                 requestBody: requestBodyString, events: events)
             return (result.response, result.trace)
         }
         let result = try await structuredNonStreamingResponse(
             session: session, prompt: finalPrompt, schema: schema,
             id: requestId, created: created, genOpts: genOpts,
-            promptTokens: promptTokens, requestBody: requestBodyString, events: events)
+            promptTokens: promptTokens,
+            backend: backend,
+            requestBody: requestBodyString, events: events)
         return (result.response, result.trace)
     }
 
@@ -206,6 +228,7 @@ func handleChatCompletion(_ request: Request, context: some RequestContext) asyn
                                        id: requestId, created: created,
                                        genOpts: genOpts, promptTokens: promptTokens,
                                        includeUsage: includeUsage,
+                                       backend: backend,
                                        requestBody: requestBodyString, events: events)
         return (result.response, result.trace)
     } else {
@@ -213,6 +236,7 @@ func handleChatCompletion(_ request: Request, context: some RequestContext) asyn
                                                      id: requestId, created: created,
                                                      genOpts: genOpts, promptTokens: promptTokens,
                                                      jsonMode: jsonMode,
+                                                     backend: backend,
                                                      requestBody: requestBodyString, events: events)
         return (result.response, result.trace)
     }
@@ -249,7 +273,7 @@ private func mcpAutoExecuteResponse(
             return result.content
         }
     } catch {
-        let classified = ApfelError.classify(error)
+        let classified = reclassifyForBackend(ApfelError.classify(error), backend: sessionOptions.backend)
         if case .refusal(let explanation) = classified {
             if streaming {
                 return await refusalStreamingResponse(
@@ -297,7 +321,7 @@ private func mcpAutoExecuteResponse(
             content = rawContent
         }
     } catch {
-        let classified = ApfelError.classify(error)
+        let classified = reclassifyForBackend(ApfelError.classify(error), backend: sessionOptions.backend)
         let msg = classified.openAIMessage
         return chatFailure(
             status: .init(code: classified.httpStatusCode),
@@ -387,6 +411,7 @@ private func nonStreamingResponse(
     genOpts: GenerationOptions,
     promptTokens: Int,
     jsonMode: Bool,
+    backend: ModelBackend,
     requestBody: String?,
     events: [String]
 ) async throws -> (response: Response, trace: ChatRequestTrace) {
@@ -399,7 +424,7 @@ private func nonStreamingResponse(
             try await collectStream(session, prompt: prompt, options: genOpts)
         }
     } catch {
-        let classified = ApfelError.classify(error)
+        let classified = reclassifyForBackend(ApfelError.classify(error), backend: backend)
         if case .refusal(let explanation) = classified {
             return await refusalNonStreamingResponse(
                 id: id, created: created, promptTokens: promptTokens,
@@ -477,6 +502,7 @@ private func streamingResponse(
     genOpts: GenerationOptions,
     promptTokens: Int,
     includeUsage: Bool,
+    backend: ModelBackend,
     requestBody: String?,
     events: [String]
 ) -> (response: Response, trace: ChatRequestTrace) {
@@ -597,7 +623,7 @@ private func streamingResponse(
                 streamCancelled = true
                 await eventBox.append("stream cancelled by client")
             } catch {
-                let classified = ApfelError.classify(error)
+                let classified = reclassifyForBackend(ApfelError.classify(error), backend: backend)
                 // Output-side context overflow with content already streamed is
                 // a graceful length-finish, not an error. See StreamErrorResolver.
                 if case .truncated(let truncatedContent) = StreamErrorResolver.resolve(prev: prev, error: classified) {
@@ -732,6 +758,7 @@ private func structuredNonStreamingResponse(
     created: Int,
     genOpts: GenerationOptions,
     promptTokens: Int,
+    backend: ModelBackend,
     requestBody: String?,
     events: [String]
 ) async throws -> (response: Response, trace: ChatRequestTrace) {
@@ -743,7 +770,7 @@ private func structuredNonStreamingResponse(
             return result.content.jsonString
         }
     } catch {
-        let classified = ApfelError.classify(error)
+        let classified = reclassifyForBackend(ApfelError.classify(error), backend: backend)
         if case .refusal(let explanation) = classified {
             return await refusalNonStreamingResponse(
                 id: id, created: created, promptTokens: promptTokens,
@@ -805,6 +832,7 @@ private func structuredStreamingResponse(
     genOpts: GenerationOptions,
     promptTokens: Int,
     includeUsage: Bool,
+    backend: ModelBackend,
     requestBody: String?,
     events: [String]
 ) -> (response: Response, trace: ChatRequestTrace) {
@@ -886,7 +914,7 @@ private func structuredStreamingResponse(
                 streamCancelled = true
                 await eventBox.append("structured stream cancelled by client")
             } catch {
-                let classified = ApfelError.classify(error)
+                let classified = reclassifyForBackend(ApfelError.classify(error), backend: backend)
                 if case .refusal(let explanation) = classified {
                     let refusalLine = sseDataLine(sseRefusalChunk(id: id, created: created, refusal: explanation))
                     responseLines?.append(refusalLine.trimmingCharacters(in: .whitespacesAndNewlines))

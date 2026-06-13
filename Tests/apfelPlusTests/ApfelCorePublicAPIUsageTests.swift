@@ -42,6 +42,9 @@ func runApfelCorePublicAPIUsageTests() {
             .decodingFailure("d"),
             .unsupportedLanguage("tlh"),
             .toolExecution("t"),
+            .pccUnavailable("deviceNotEligible"),
+            .pccQuotaExceeded,
+            .pccNetworkFailure("offline"),
             .unknown("u"),
         ]
         for e in cases {

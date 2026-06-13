@@ -40,7 +40,15 @@ func runExitCodeMapTests() {
         try assertEqual(ApfelExitCodes.code(for: .decodingFailure("x")), 1)
         try assertEqual(ApfelExitCodes.code(for: .unsupportedLanguage("x")), 1)
         try assertEqual(ApfelExitCodes.code(for: .toolExecution("x")), 1)
+        try assertEqual(ApfelExitCodes.code(for: .pccNetworkFailure("offline")), 1)
         try assertEqual(ApfelExitCodes.code(for: .unknown("x")), 1)
+    }
+    test("ApfelExitCodes: pccUnavailable -> modelUnavailable (5)") {
+        try assertEqual(ApfelExitCodes.code(for: .pccUnavailable("deviceNotEligible")), 5)
+        try assertEqual(ApfelExitCodes.code(for: .pccUnavailable("systemNotReady")), 5)
+    }
+    test("ApfelExitCodes: pccQuotaExceeded -> rateLimited (6)") {
+        try assertEqual(ApfelExitCodes.code(for: .pccQuotaExceeded), 6)
     }
     test("ApfelExitCodes: constants match documented values") {
         try assertEqual(ApfelExitCodes.success, 0)

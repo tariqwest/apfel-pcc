@@ -91,6 +91,61 @@ func makeModel(permissive: Bool) -> SystemLanguageModel {
     )
 }
 
+/// Re-classify a server-side `ApfelError` with knowledge of which backend was
+/// asked to serve the request. The framework can throw a generic
+/// `FoundationModels.LanguageModelError error -1` from PCC paths when the
+/// runtime can't satisfy the request (e.g. no Apple Account signed in, PCC
+/// feature gated off) and our type-name-based classify can't tell that from
+/// any other unknown error - the response then comes back as an opaque 500.
+/// This wrapper turns a `.unknown` on a PCC request into a `.pccUnavailable`
+/// 503 with a clearer message; it's a no-op for on-device.
+func reclassifyForBackend(_ classified: ApfelError, backend: ModelBackend) -> ApfelError {
+    guard backend == .privateCloudCompute else { return classified }
+    switch classified {
+    case .unknown(let msg):
+        return .pccUnavailable(
+            "the framework rejected the request (\(msg.trimmingCharacters(in: .whitespacesAndNewlines))). "
+            + "Make sure Apple Intelligence is enabled, you are signed in to an Apple Account, and PCC is supported on this Mac"
+        )
+    default:
+        return classified
+    }
+}
+
+/// Throw a typed `ApfelError.pccUnavailable` if the requested backend cannot
+/// serve a request on this host. On-device callers should still pre-flight
+/// via `TokenCounter.shared.availability`; this helper covers PCC only.
+///
+/// Why this is a pre-flight rather than relying on classify(): when PCC is
+/// ineligible the `LanguageModelSession.respond` call throws a generic
+/// `FoundationModels.LanguageModelError` whose `localizedDescription` is just
+/// "The operation couldn't be completed. (LanguageModelError error -1.)" - it
+/// reveals nothing about *why* PCC said no. The `availability` property
+/// returns the structured reason (.deviceNotEligible / .systemNotReady), so
+/// checking it before we hit the framework lets us return a clear 503 with
+/// the specific reason instead of an opaque 500.
+func assertBackendAvailable(_ backend: ModelBackend) throws {
+    guard backend == .privateCloudCompute else { return }
+    guard #available(macOS 27.0, *) else {
+        throw ApfelError.pccUnavailable("requires macOS 27 or later")
+    }
+    switch PrivateCloudComputeLanguageModel().availability {
+    case .available:
+        return
+    case .unavailable(let reason):
+        // Use a switch with @unknown default so Apple can add future
+        // UnavailableReason cases without breaking our build.
+        switch reason {
+        case .deviceNotEligible:
+            throw ApfelError.pccUnavailable("deviceNotEligible")
+        case .systemNotReady:
+            throw ApfelError.pccUnavailable("systemNotReady")
+        @unknown default:
+            throw ApfelError.pccUnavailable(String(describing: reason))
+        }
+    }
+}
+
 /// Build a `LanguageModelSession` from `entries`, dispatching on `backend`.
 /// PCC requires macOS 27.0+; on older systems the call falls back to the
 /// on-device `SystemLanguageModel` (the caller is responsible for surfacing

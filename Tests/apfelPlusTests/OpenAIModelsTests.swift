@@ -145,6 +145,46 @@ func runChatRequestValidatorTests() {
         try assertNil(ChatRequestValidator.validate(request))
     }
 
+    test("validator accepts the canonical PCC model id") {
+        let request = try decode(
+            ChatCompletionRequest.self,
+            from: #"{"model":"apple-foundationmodel-pcc","messages":[{"role":"user","content":"hi"}]}"#
+        )
+        try assertNil(ChatRequestValidator.validate(request))
+    }
+
+    test("validator accepts the short pcc alias") {
+        let request = try decode(
+            ChatCompletionRequest.self,
+            from: #"{"model":"pcc","messages":[{"role":"user","content":"hi"}]}"#
+        )
+        try assertNil(ChatRequestValidator.validate(request))
+    }
+
+    test("validator accepts the apfel-pcc alias") {
+        let request = try decode(
+            ChatCompletionRequest.self,
+            from: #"{"model":"apfel-pcc","messages":[{"role":"user","content":"hi"}]}"#
+        )
+        try assertNil(ChatRequestValidator.validate(request))
+    }
+
+    test("validator model check is case-insensitive") {
+        let request = try decode(
+            ChatCompletionRequest.self,
+            from: #"{"model":"Apple-FoundationModel-PCC","messages":[{"role":"user","content":"hi"}]}"#
+        )
+        try assertNil(ChatRequestValidator.validate(request))
+    }
+
+    test("validator trims surrounding whitespace on the model field") {
+        let request = try decode(
+            ChatCompletionRequest.self,
+            from: #"{"model":"  pcc  ","messages":[{"role":"user","content":"hi"}]}"#
+        )
+        try assertNil(ChatRequestValidator.validate(request))
+    }
+
     test("validator rejects unsupported parameters") {
         let request = try decode(
             ChatCompletionRequest.self,

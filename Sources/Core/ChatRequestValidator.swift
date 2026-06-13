@@ -96,7 +96,7 @@ public enum ChatRequestValidationFailure: Sendable, Equatable, Hashable, CustomS
         case .invalidParameterValue(let detail):
             return detail
         case .invalidModel(let model):
-            return "The model '\(model)' does not exist. The only available model is 'apple-foundationmodel'."
+            return "The model '\(model)' does not exist. Available models: 'apple-foundationmodel' (on-device), 'apple-foundationmodel-pcc' (Private Cloud Compute; aliases: pcc, apfel-pcc)."
         }
     }
 
@@ -124,8 +124,21 @@ public enum ChatRequestValidationFailure: Sendable, Equatable, Hashable, CustomS
 }
 
 public enum ChatRequestValidator {
-    /// The only model name this server accepts.
+    /// The canonical on-device model name. Kept for backwards-compatibility
+    /// with existing tests and external consumers that snapshot this constant.
+    /// New code should use `ModelBackend.from(modelName:)` to route.
     public static let validModel = "apple-foundationmodel"
+
+    /// The set of model ids this server accepts on `/v1/chat/completions`.
+    /// Matches the entries advertised by `/v1/models` and the parsing rules in
+    /// `ModelBackend.from(modelName:)`. Comparison is case-insensitive after
+    /// trimming whitespace, mirroring the parser.
+    public static let acceptedModelIDs: Set<String> = [
+        "apple-foundationmodel",
+        "apple-foundationmodel-pcc",
+        "pcc",
+        "apfel-pcc",
+    ]
 
     /// Validates a decoded chat-completions request.
     ///
@@ -136,7 +149,10 @@ public enum ChatRequestValidator {
             return .emptyMessages
         }
 
-        if request.model != validModel {
+        let normalized = request.model
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+            .lowercased()
+        if !acceptedModelIDs.contains(normalized) {
             return .invalidModel(request.model)
         }
 

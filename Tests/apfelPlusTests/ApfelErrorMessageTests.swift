@@ -194,7 +194,7 @@ func runApfelErrorMessageTests() {
         )
         try assertEqual(
             ChatRequestValidationFailure.invalidModel("gpt-5").message,
-            "The model 'gpt-5' does not exist. The only available model is 'apple-foundationmodel'."
+            "The model 'gpt-5' does not exist. Available models: 'apple-foundationmodel' (on-device), 'apple-foundationmodel-pcc' (Private Cloud Compute; aliases: pcc, apfel-pcc)."
         )
         // unsupportedParameter delegates to the parameter's own message —
         // sampled here, fully covered below.
