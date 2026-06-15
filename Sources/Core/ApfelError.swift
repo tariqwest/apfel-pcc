@@ -26,6 +26,13 @@ public enum ApfelError: Error, Equatable, Hashable, Sendable {
     /// Classify any thrown error into a typed ApfelError.
     /// Matches on FoundationModels.GenerationError first, falls back to string matching.
     public static func classify(_ error: Error) -> ApfelError {
+        classify(error, wasPCCRequest: false)
+    }
+
+    /// Classify with PCC context — when `wasPCCRequest` is true, opaque
+    /// ModelManagerError failures are mapped to `.pccUnavailable` rather than
+    /// `.unknown`.
+    public static func classify(_ error: Error, wasPCCRequest: Bool) -> ApfelError {
         if let already = error as? ApfelError { return already }
         if let mcpError = error as? MCPError {
             return .toolExecution(mcpError.description)
@@ -38,6 +45,13 @@ public enum ApfelError: Error, Equatable, Hashable, Sendable {
             typeName: typeName,
             mirror: mirror,
             localizedDescription: error.localizedDescription
+        ) {
+            return pccError
+        }
+        if let pccError = classifyModelManagerPCCError(
+            mirror: mirror,
+            localizedDescription: error.localizedDescription,
+            wasPCCRequest: wasPCCRequest
         ) {
             return pccError
         }
@@ -74,6 +88,29 @@ public enum ApfelError: Error, Equatable, Hashable, Sendable {
             return .pccUnavailable("serviceUnavailable")
         }
         return .pccUnavailable(localizedDescription)
+    }
+
+    /// Detect PCC-specific failures that arrive as a generic GenerationError
+    /// wrapping a ModelManagerError (e.g. Code=1046 on macOS 27 beta when the
+    /// PCC backend is provisioned but cannot serve requests). This is called
+    /// after classifyPCCError returns nil — i.e. the error does not
+    /// self-identify as PrivateCloudCompute, but it originated from a PCC
+    /// session.
+    private static func classifyModelManagerPCCError(
+        mirror: String,
+        localizedDescription: String,
+        wasPCCRequest: Bool
+    ) -> ApfelError? {
+        guard wasPCCRequest else { return nil }
+        // ModelManagerError 1046 = the model backend rejected the session.
+        if mirror.contains("ModelManagerError") || mirror.contains("ModelManagerServices") {
+            return .pccUnavailable(
+                "the framework rejected the request (\(localizedDescription)). " +
+                "Make sure Apple Intelligence is enabled, you are signed in to an Apple Account, " +
+                "and PCC is supported on this Mac"
+            )
+        }
+        return nil
     }
 
     private static func classifyGenerationError(

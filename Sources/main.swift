@@ -271,7 +271,7 @@ do {
         break   // Already handled above; exhaustive switch.
     }
 } catch {
-    let classified = ApfelError.classify(error)
+    let classified = reclassifyForBackend(ApfelError.classify(error, wasPCCRequest: sessionOpts.backend == .privateCloudCompute), backend: sessionOpts.backend)
     printError("\(classified.cliLabel) \(classified.openAIMessage)")
     exit(exitCode(for: classified))
 }
