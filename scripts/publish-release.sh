@@ -146,7 +146,7 @@ git config user.name "Arthur Ficial"
 git config user.email "arti.ficial@fullstackoptimization.com"
 if ! git diff --quiet -- Formula/apfel-plus.rb; then
     git add Formula/apfel-plus.rb
-    git commit -m "apfel v$version"
+    git commit -m "apfel-plus v$version"
     git push origin main
     echo "Tap updated to v$version"
 else

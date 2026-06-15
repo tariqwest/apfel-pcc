@@ -33,12 +33,13 @@ if [[ -z "$version" || -z "$sha256" || -z "$output" ]]; then
 fi
 
 cat > "$output" <<EOF
-class Apfel < Formula
+class ApfelPlus < Formula
   desc "On-device Apple FoundationModels CLI and OpenAI-compatible server"
-  homepage "https://github.com/Arthur-Ficial/apfel"
-  url "https://github.com/Arthur-Ficial/apfel/releases/download/v${version}/apfel-${version}-arm64-macos.tar.gz"
+  homepage "https://github.com/tariqwest/apfel-plus"
+  url "https://github.com/tariqwest/apfel-plus/releases/download/v${version}/apfel-plus-${version}-arm64-macos.tar.gz"
   sha256 "${sha256}"
   license "MIT"
+  head "https://github.com/tariqwest/apfel-plus.git", branch: "main"
 
   depends_on arch: :arm64
   # macOS-only hard block. Unlike homebrew-core's formula (which builds from
@@ -52,70 +53,70 @@ class Apfel < Formula
   depends_on macos: :tahoe
 
   def install
-    bin.install "apfel"
-    man1.install "apfel.1"
+    bin.install "apfel-plus"
+    man1.install "apfel-plus.1"
 
     # Ship the demo/ pipe-friendly examples (cmd, explain, gitsum, mac-narrator,
-    # naming, oneliner, port, wtd) as apfel-<name> companion commands. The
-    # apfel- prefix avoids global PATH collisions ('port' would shadow MacPorts).
+    # naming, oneliner, port, wtd) as apfel-plus-<name> companion commands. The
+    # apfel-plus- prefix avoids global PATH collisions ('port' would shadow MacPorts).
     if File.directory?("demo")
       pkgshare.install "demo"
       %w[cmd explain gitsum mac-narrator naming oneliner port wtd].each do |d|
         target = pkgshare/"demo/#{d}"
         next unless target.exist?
 
-        bin.install_symlink target => "apfel-#{d}"
+        bin.install_symlink target => "apfel-plus-#{d}"
       end
     end
   end
 
   service do
-    run [opt_bin/"apfel", "--serve"]
+    run [opt_bin/"apfel-plus", "--serve"]
     keep_alive true
-    log_path var/"log/apfel.log"
-    error_log_path var/"log/apfel.log"
+    log_path var/"log/apfel-plus.log"
+    error_log_path var/"log/apfel-plus.log"
   end
 
   def caveats
     s = <<~EOS
-      apfel requires:
+      apfel-plus requires:
         - macOS 26 Tahoe or newer (enforced by this formula)
         - Apple Silicon (M1 or later) - Tahoe is Apple Silicon only
         - Apple Intelligence enabled in System Settings > Apple Intelligence & Siri
 
       Verify everything is ready:
-        apfel --model-info
+        apfel-plus --model-info
 
       If the model is unavailable, enable Apple Intelligence:
         https://support.apple.com/en-us/121115
 
       Companion demo commands (pipe-friendly bash scripts) installed:
-        apfel-cmd           natural language -> shell command
-        apfel-oneliner      complex awk/sed/find pipe chains
-        apfel-explain       explain a command, error, or code snippet
-        apfel-wtd           "what's this directory?" project orientation
-        apfel-naming        suggest names for functions/variables/classes
-        apfel-port          identify the process on a port
-        apfel-gitsum        plain-English summary of recent git activity
-        apfel-mac-narrator  dry-British-humor system narration
+        apfel-plus-cmd           natural language -> shell command
+        apfel-plus-oneliner      complex awk/sed/find pipe chains
+        apfel-plus-explain       explain a command, error, or code snippet
+        apfel-plus-wtd           "what's this directory?" project orientation
+        apfel-plus-naming        suggest names for functions/variables/classes
+        apfel-plus-port          identify the process on a port
+        apfel-plus-gitsum        plain-English summary of recent git activity
+        apfel-plus-mac-narrator  dry-British-humor system narration
     EOS
     unless Hardware::CPU.arm?
       s += <<~EOS
 
         Note: Homebrew reports this process as non-arm64. If you are on a real
-        Apple Silicon Mac (M1+), apfel will still run - your brew install may
+        Apple Silicon Mac (M1+), apfel-plus will still run - your brew install may
         be running under Rosetta. See:
-        https://github.com/Arthur-Ficial/apfel/issues/45
+        https://github.com/tariqwest/apfel-plus/issues
       EOS
     end
     s
   end
 
   test do
-    assert_match "apfel v#{version}", shell_output("#{bin}/apfel --version")
-    assert_path_exists man1/"apfel.1"
-    assert_path_exists bin/"apfel-cmd"
-    assert_predicate bin/"apfel-cmd", :symlink?
+    assert_match "apfel-plus v#{version}", shell_output("#{bin}/apfel-plus --version")
+    assert_path_exists man1/"apfel-plus.1"
+    assert_path_exists bin/"apfel-plus-cmd"
+    assert_predicate bin/"apfel-plus-cmd", :symlink?
   end
 end
 EOF
