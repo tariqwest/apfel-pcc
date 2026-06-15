@@ -38,6 +38,10 @@ apfel-plus \- Apple Intelligence from the command line
 .br
 .B apfel-plus
 .B \-\-update
+.br
+.B apfel-plus
+.B \-\-demos
+.RI [ dir ]
 .SH DESCRIPTION
 .B apfel-plus
 is a command-line interface and OpenAI-compatible HTTP server for
@@ -192,6 +196,13 @@ Re-run to refresh the configuration; use
 .B launchctl bootout gui/$UID/com.apfel-plus.serve
 to remove. A LaunchAgent (not a LaunchDaemon) is used because
 Apple Intelligence is only accessible from the logged-in user's GUI session.
+.TP
+.B \-\-demos\fR \fI[dir]\fR
+Write the bundled demo scripts to
+.I dir
+(default
+.BR ./apfel-demos ).
+The demos are embedded in the binary, so this works the same regardless of how apfel-plus was installed.
 .TP
 .B \-\-debug
 Enable verbose debug logging to standard error in every mode.

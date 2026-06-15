@@ -2,7 +2,7 @@
 
 ### The free AI already on your Mac.
 
-[![Version 1.5.5](https://img.shields.io/badge/version-1.5.5-blue)](https://github.com/tariqwest/apfel-plus)
+[![Version 1.6.0](https://img.shields.io/badge/version-1.6.0-blue)](https://github.com/tariqwest/apfel-plus)
 [![Swift 6.3+](https://img.shields.io/badge/Swift-6.3%2B-F05138?logo=swift&logoColor=white)](https://swift.org)
 [![macOS 26 Tahoe+](https://img.shields.io/badge/macOS-26%20Tahoe%2B-000000?logo=apple&logoColor=white)](https://developer.apple.com/macos/)
 [![No Xcode Required](https://img.shields.io/badge/Xcode-not%20required-orange)](https://developer.apple.com/xcode/resources/)
@@ -140,7 +140,13 @@ Ctrl-C exits. Context is trimmed automatically ([docs/context-strategies.md](doc
 
 ## Demos
 
-Shell scripts in [`demo/`](./demo/):
+Real-world shell scripts that wrap `apfel`. They are bundled inside the binary, so you can write them out wherever you installed apfel from (homebrew-core, the tap, or source) - no repo clone needed:
+
+```bash
+apfel demos ./apfel-demos
+```
+
+That writes every demo (executable) into `./apfel-demos`, plus a `README.md` describing each. Re-run after `brew upgrade apfel` to refresh them. The same scripts also live in [`demo/`](./demo/) in this repo.
 
 **[cmd](./demo/cmd)** - natural language to shell command:
 

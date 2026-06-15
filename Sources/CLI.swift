@@ -324,6 +324,35 @@ func printRelease() {
     """)
 }
 
+// MARK: - Demos
+
+/// Write the bundled demo scripts to a directory. Because the demos are
+/// embedded in the binary, this behaves identically across homebrew-core, the
+/// tap, and source builds - there is no brew `--with-demo` option that could.
+/// Returns a process exit code.
+func runDemosInstall(target: String?) -> Int32 {
+    let dirPath = target ?? "apfel-demos"
+    let dir = URL(fileURLWithPath: dirPath)
+    do {
+        let installed = try DemoInstaller.install(into: dir)
+        let resolved = dir.path
+        print("\(styled("apfel:", .green, .bold)) wrote \(installed.count) demo files to \(styled(resolved, .cyan))")
+        for demo in installed where demo.executable {
+            print("  \(styled("•", .dim)) \(demo.name)")
+        }
+        print("")
+        print("Try one:")
+        print("  \(styled("\(resolved)/cmd", .cyan)) \"find files larger than 100MB\"")
+        print("  \(styled("cat", .dim)) README.md | \(styled("\(resolved)/explain", .cyan)) ")
+        print("")
+        print("See \(styled("\(resolved)/README.md", .cyan)) for what each demo does.")
+        return exitSuccess
+    } catch {
+        printError("could not write demos to \(dirPath): \(error)")
+        return exitRuntimeError
+    }
+}
+
 // MARK: - Self-Update
 
 /// Check for updates and optionally run `brew upgrade apfel-plus`.
@@ -464,6 +493,7 @@ func printUsage() {
           --autostart            Install a LaunchAgent so the server starts at login
                                  and respawns on crash. Captures any --serve flags
                                  passed alongside (e.g. --port, --host, --token).
+          --demos [dir]          Write the bundled demo scripts to dir [default: ./apfel-demos]
           --debug                Enable debug logging to stderr (all modes)
       -h, --help                Show this help
       -v, --version             Print version

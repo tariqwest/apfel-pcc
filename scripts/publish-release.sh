@@ -95,7 +95,11 @@ trap - EXIT
 # --- Commit + tag + push ---
 step "Commit and tag v$version"
 
-git add .version README.md Sources/BuildInfo.swift
+# Stamp the accumulated [Unreleased] entries as this version so CHANGELOG.md
+# stays current with every release (#201). Idempotent.
+bash scripts/stamp-changelog.sh "$version"
+
+git add .version README.md Sources/BuildInfo.swift CHANGELOG.md
 git commit -m "release v$version"
 git tag -a "v$version" -m "v$version"
 git push origin HEAD:main

@@ -34,11 +34,13 @@ MERGE_COMMAND="@NixOS/nixpkgs-merge-bot merge"
 
 version=""
 dry_run=false
+close_stale_blockers=false
 
 while [[ $# -gt 0 ]]; do
   case "$1" in
     --version) version="${2:-}"; shift 2 ;;
     --dry-run) dry_run=true; shift ;;
+    --close-stale-blockers) close_stale_blockers=true; shift ;;
     -h|--help) sed -n '2,28p' "$0" | sed 's/^# \{0,1\}//'; exit 0 ;;
     *) echo "unknown arg: $1" >&2; exit 1 ;;
   esac
@@ -109,6 +111,40 @@ for pr in $own_bumps; do
       >/dev/null 2>&1 || warn "could not close #$pr"
   fi
 done
+
+# --- Detect third-party PRs squatting the slot ---
+# A non-r-ryantm, non-own open bump PR blocks r-ryantm from opening its own and
+# cannot be merge-bot merged (the bot only acts on r-ryantm or committer-opened
+# PRs). If such a PR is behind the latest release it is superseded; surface it
+# loudly and, with --close-stale-blockers, close it courteously so r-ryantm is
+# unblocked. This is the failure mode that stranded apfel-llm at 1.0.5 for weeks.
+blockers_tsv=$(gh pr list --repo "$UPSTREAM" --state open --search "apfel-llm in:title" \
+  --json number,author,title,headRepositoryOwner \
+  --jq ".[] | select(.author.login!=\"r-ryantm\")
+            | select(.headRepositoryOwner.login!=\"$MAINTAINER_LOGIN\")
+            | [.number, .author.login, .title] | @tsv" 2>/dev/null || true)
+while IFS=$'\t' read -r b_num b_login b_title; do
+  [[ -z "$b_num" ]] && continue
+  b_ver=$(sed -E 's/.*-> *([0-9]+\.[0-9]+\.[0-9]+).*/\1/' <<<"$b_title")
+  behind=no
+  if [[ "$b_ver" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ && "$b_ver" != "$version" ]]; then
+    lowest=$(printf '%s\n%s\n' "$b_ver" "$version" | sort -V | head -1)
+    [[ "$lowest" == "$b_ver" ]] && behind=yes
+  fi
+  if [[ "$behind" == "yes" ]]; then
+    warn "PR #$b_num by @$b_login ('$b_title') is behind the latest release ($version) and is BLOCKING r-ryantm - it cannot be merge-bot merged (wrong author)."
+    if $close_stale_blockers && ! $dry_run; then
+      info "Closing superseded third-party PR #$b_num to unblock r-ryantm."
+      gh pr close "$b_num" --repo "$UPSTREAM" --comment \
+        "Thanks for the bump! apfel-llm now has an active maintainer and is at v$version, so this is superseded and cannot go through the merge-bot. Closing in favour of the r-ryantm auto-update flow, which brings it straight to the latest release. Much appreciated." \
+        >/dev/null 2>&1 || warn "could not close #$b_num"
+    else
+      warn "Re-run with --close-stale-blockers to close it automatically, or close PR #$b_num manually."
+    fi
+  else
+    info "Open third-party PR #$b_num by @$b_login ('$b_title') is at/ahead of target - leaving it for review."
+  fi
+done < <(printf '%s\n' "$blockers_tsv")
 
 # --- Find the open r-ryantm bump PR for apfel-llm ---
 rr_pr=$(gh pr list --repo "$UPSTREAM" --state open --author r-ryantm \

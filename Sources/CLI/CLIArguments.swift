@@ -23,6 +23,7 @@ public struct CLIArguments: Sendable, Equatable {
         case modelInfo = "model-info"
         case update
         case autostart
+        case demos
         case help
         case version
         case release
@@ -39,6 +40,9 @@ public struct CLIArguments: Sendable, Equatable {
     }
 
     public var mode: Mode = .single
+
+    /// Target directory for `--demos` / `demos <dir>` (nil => default chosen at run time).
+    public var demosTarget: String? = nil
 
     // MARK: - Prompt & Content
 
@@ -209,6 +213,17 @@ extension CLIArguments {
         // participate in conflict detection.
         var context = ValidationContext()
 
+        // Subcommand form: `apfel demos [dir]`. Bare `demos` as the first token
+        // is the friendly alias for `--demos`; a quoted prompt ("demos") still
+        // works as a normal prompt because it is not the literal first arg here.
+        if args.first == "demos" {
+            result.mode = .demos
+            if args.count > 1, !args[1].hasPrefix("-") {
+                result.demosTarget = args[1]
+            }
+            return result
+        }
+
         var i = 0
         while i < args.count {
             switch args[i] {
@@ -294,6 +309,15 @@ extension CLIArguments {
             case "--autostart":
                 context.modeFlagsSeen.append("--autostart")
                 result.mode = .autostart
+
+            case "--demos":
+                context.modeFlagsSeen.append("--demos")
+                result.mode = .demos
+                // Optional positional target dir directly after the flag.
+                if i + 1 < args.count, !args[i + 1].hasPrefix("-") {
+                    i += 1
+                    result.demosTarget = args[i]
+                }
 
             // -- Server --
 

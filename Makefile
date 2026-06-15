@@ -2,7 +2,7 @@ PREFIX ?= /usr/local
 BINARY = apfel-plus
 VERSION_FILE = .version
 
-.PHONY: check-toolchain build install uninstall clean bump-patch bump-minor bump-major generate-build-info generate-man-page man update-readme version release release-patch release-minor release-major package-release-asset print-release-asset print-release-sha256 update-homebrew-formula preflight benchmark test
+.PHONY: check-toolchain build install uninstall clean bump-patch bump-minor bump-major generate-build-info generate-demos generate-man-page man update-readme version release release-patch release-minor release-major package-release-asset print-release-asset print-release-sha256 update-homebrew-formula preflight benchmark test
 
 # --- Environment checks ---
 
@@ -137,6 +137,12 @@ release-major: check-toolchain bump-major generate-build-info update-readme
 	@$(MAKE) --no-print-directory generate-man-page
 
 # --- Generated files ---
+
+# Embed demo/ into Sources/Core/GeneratedDemos.swift so `apfel demos <dir>`
+# works identically across every install channel. Re-run when demo/ changes;
+# Tests/integration/test_demos.py fails if the generated file drifts.
+generate-demos:
+	@bash scripts/generate-demos.sh
 
 generate-build-info:
 	@v=$$(cat $(VERSION_FILE)); \

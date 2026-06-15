@@ -101,6 +101,8 @@ case .version:
 case .release:
     printRelease()
     exit(exitSuccess)
+case .demos:
+    exit(runDemosInstall(target: parsed.demosTarget))
 default:
     break
 }
@@ -265,7 +267,7 @@ do {
         }
         try await singlePrompt(prompt, systemPrompt: parsed.systemPrompt, stream: false, options: sessionOpts, mcpManager: mcpManager)
 
-    case .help, .version, .release:
+    case .help, .version, .release, .demos:
         break   // Already handled above; exhaustive switch.
     }
 } catch {

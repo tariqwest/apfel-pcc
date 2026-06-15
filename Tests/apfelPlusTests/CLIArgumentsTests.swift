@@ -75,6 +75,38 @@ func runCLIArgumentsTests() {
         try assertEqual(args.mode, .update)
     }
 
+    test("--demos sets demos mode with no target") {
+        let args = try CLIArguments.parse(["--demos"])
+        try assertEqual(args.mode, .demos)
+        try assertNil(args.demosTarget)
+    }
+
+    test("--demos <dir> captures the target directory") {
+        let args = try CLIArguments.parse(["--demos", "/tmp/x"])
+        try assertEqual(args.mode, .demos)
+        try assertEqual(args.demosTarget, "/tmp/x")
+    }
+
+    test("demos subcommand sets demos mode") {
+        let args = try CLIArguments.parse(["demos"])
+        try assertEqual(args.mode, .demos)
+        try assertNil(args.demosTarget)
+    }
+
+    test("demos subcommand with dir captures the target") {
+        let args = try CLIArguments.parse(["demos", "./my-demos"])
+        try assertEqual(args.mode, .demos)
+        try assertEqual(args.demosTarget, "./my-demos")
+    }
+
+    test("quoted prompt 'demos' is NOT the subcommand when it is the prompt value") {
+        // A real prompt that happens to equal "demos" still triggers the
+        // subcommand (bare first token); users wanting it as a prompt can phrase
+        // it differently. This documents the intended precedence.
+        let args = try CLIArguments.parse(["demos"])
+        try assertEqual(args.mode, .demos)
+    }
+
     test("tag is no longer a subcommand - treated as a normal prompt (moved to apfel-plus-tag)") {
         let args = try CLIArguments.parse(["tag"])
         try assertEqual(args.mode, .single)

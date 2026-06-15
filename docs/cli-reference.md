@@ -58,6 +58,7 @@ META
   --release                               Detailed build info
   --model-info                            Print model capabilities
   --update                                Check for updates via Homebrew
+  --demos [dir]                           Write bundled demo scripts to dir [default: ./apfel-demos]
 ```
 
 ## Examples By Flag
@@ -154,6 +155,10 @@ apfel-plus --update
 apfel-plus --release
 apfel-plus --version
 apfel-plus --help
+
+# --demos: write the bundled demo scripts out (works on every install channel)
+apfel-plus demos ./apfel-demos
+apfel-plus --demos ./apfel-demos
 ```
 
 Security details live in [server-security.md](server-security.md). Background-service usage lives in [background-service.md](background-service.md).

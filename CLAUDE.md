@@ -85,7 +85,7 @@ HTTP Server (/v1/*) ───────┘   ContextManager → Transcript API
 ## Current Status
 
 - Version: `1.5.5` (source of truth: `.version`)
-- Tests: 661 unit + 274 integration
+- Tests: 673 unit + 286 integration
 - Distribution: homebrew-core (`brew install apfel-plus`), nixpkgs (`nix profile install nixpkgs#apfel-plus-llm`), and the tariqwest/homebrew-tap
 - Stability policy: [STABILITY.md](STABILITY.md)
 - Security policy: [SECURITY.md](SECURITY.md)
@@ -98,11 +98,11 @@ make install                   # build release + install to /usr/local/bin (NO v
 make build                     # build release only (NO version bump)
 make version                   # print current version
 swift build                    # debug build
-swift run apfel-plus-tests     # unit tests only (661 tests)
+swift run apfel-plus-tests     # unit tests only (673 tests)
 make preflight                 # full release qualification (unit + integration + policy checks)
 ```
 
-`make test` builds the release binary, runs all 661 unit tests, starts test servers, runs all 274 integration tests, and cleans up. This is the single command for development.
+`make test` builds the release binary, runs all 673 unit tests, starts test servers, runs all 286 integration tests, and cleans up. This is the single command for development.
 
 `make install` auto-unlinks Homebrew apfel-plus so the dev binary takes PATH priority. `make uninstall` restores the Homebrew link.
 
@@ -131,7 +131,7 @@ bash scripts/generate-examples.sh          # ~2 minutes, overwrites docs/EXAMPLE
 | Security | `Sources/Core/OriginValidator.swift`, `Sources/SecurityMiddleware.swift` |
 | MCP client | `Sources/Core/MCPProtocol.swift`, `Sources/MCPClient.swift` |
 | MCP calculator | `mcp/calculator/server.py` |
-| Tests | `Tests/apfelPlusTests/` (661 unit), `Tests/integration/` (274 integration) |
+| Tests | `Tests/apfelPlusTests/` (673 unit), `Tests/integration/` (286 integration) |
 
 | Docs | `docs/` (brew-install, EXAMPLES, release, tool-calling-guide) |
 | Scripts | `scripts/generate-examples.sh`, `scripts/write-homebrew-formula.sh`, `scripts/release-preflight.sh`, `scripts/post-release-verify.sh` |
@@ -375,7 +375,7 @@ apfel-plus ships through three channels. All pull the same signed tarball from e
 
 **What runs the full suite (local, before every release):**
 - `make preflight` or `make release` on a Mac with Apple Intelligence
-- 661 unit + 274 integration = 935 tests, 0 skipped
+- 673 unit + 286 integration = 959 tests, 0 skipped
 - Release scripts use directory discovery (`Tests/integration/`), not explicit file lists
 - This is the REAL qualification gate. GitHub CI is a safety net, not the source of truth.
 
