@@ -237,16 +237,11 @@ if messagesJSON == nil && parsed.mode.acceptsStdinInput && isatty(STDIN_FILENO) 
         } else {
             fileContents.append(stdinContent)
         }
-<<<<<<< HEAD
-    } else if !prompt.isEmpty && !quietMode && stdinIsPipe() {
-        printStderr("\(styled("apfel-plus:", .yellow)) piped input was empty - if the command prints to stderr, try: command 2>&1 | apfel-plus")
-=======
     } else if !quietMode && stdinIsPipe() {
         // Empty pipe: hint about stderr redirection. Fires whether or not a
         // prompt was given, so the bare-pipe case (`somecmd | apfel`, no args)
         // still gets the hint now that it flows through this path (#152, #222).
         printStderr("\(styledErr("apfel:", .yellow)) piped input was empty - if the command prints to stderr, try: command 2>&1 | apfel")
->>>>>>> upstream/main
     }
 }
 
