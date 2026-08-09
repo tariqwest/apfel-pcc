@@ -82,10 +82,6 @@ func singlePrompt(_ prompt: String, systemPrompt: String?, stream: Bool, options
         print(jsonString(obj))
     }
 
-<<<<<<< HEAD
-    if result.finishReason == .length {
-        printStderr("\(styled("apfel-plus:", .yellow)) response truncated at the context window (finish_reason=length). Pass --max-tokens to control the cap explicitly.")
-=======
     printLengthWarningIfNeeded(result.finishReason)
     return 0
 }
@@ -99,7 +95,6 @@ func printCroppedResponse(_ content: String) -> Int32 {
     guard let crop = CodeCropper.crop(from: content) else {
         printStderr("\(styledErr("apfel:", .yellow)) empty model response, no code to print")
         return ApfelExitCodes.noCode
->>>>>>> upstream/main
     }
     switch outputFormat {
     case .plain:
@@ -727,11 +722,7 @@ func performUpdate() {
     }
 
     // Check for updates via brew
-<<<<<<< HEAD
-    let outdatedJSON = shellOutput("/opt/homebrew/bin/brew", args: ["info", "--json=v2", "apfel-plus"])
-=======
     let outdatedJSON = shellOutput(brewExec, args: ["info", "--json=v2", "apfel"])
->>>>>>> upstream/main
     guard let data = outdatedJSON.data(using: .utf8),
           let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
           let formulae = json["formulae"] as? [[String: Any]],
