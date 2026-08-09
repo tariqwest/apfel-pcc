@@ -37,18 +37,17 @@ enum SchemaConverter {
 
     private actor SchemaConversionCache {
         static let shared = SchemaConversionCache()
-        private let maxEntries = 64
-        private var entries: [[ToolSignature]: CachedSchemaConversion] = [:]
+        // Bounded LRU: at capacity, evict only the least-recently-used entry
+        // instead of wiping all 64. A full flush let two alternating clients,
+        // each with >32 distinct tool sets, churn the whole cache repeatedly (#247).
+        private var cache = LRUCache<[ToolSignature], CachedSchemaConversion>(capacity: 64)
 
         func value(for key: [ToolSignature]) -> CachedSchemaConversion? {
-            entries[key]
+            cache.value(forKey: key)
         }
 
         func insert(_ value: CachedSchemaConversion, for key: [ToolSignature]) {
-            if entries.count >= maxEntries {
-                entries.removeAll(keepingCapacity: true)
-            }
-            entries[key] = value
+            cache.insert(value, forKey: key)
         }
     }
 
@@ -160,11 +159,15 @@ enum SchemaConverter {
             // schema-guided generation (#167).
             return DynamicGenerationSchema(type: String.self)
 
-        case .number:
-            // JSON Schema integer/number. The IR conflates the two; on-device
-            // structured output uses Int (a valid JSON number) as the default
-            // scalar so fields decode as numbers, not empty objects (#167).
+        case .integer:
+            // JSON Schema `integer` -> whole numbers only.
             return DynamicGenerationSchema(type: Int.self)
+
+        case .number:
+            // JSON Schema `number` -> may be fractional; must map to Double so
+            // structured output can produce values like 9.99 (#243). Mapping it
+            // to Int made fractional outputs unreachable.
+            return DynamicGenerationSchema(type: Double.self)
 
         case .bool:
             return DynamicGenerationSchema(type: Bool.self)

@@ -2,7 +2,11 @@
 
 Call Apple's on-device Foundation Model from Python using the official `openai` SDK, pointed at a local `apfel-plus --serve`. 100% on-device, zero API cost, no network required for inference.
 
+<<<<<<< HEAD
 This guide shows the canonical patterns: one-shot completion, streaming, JSON mode, error handling, tool calling, and a real text-summarization example. Every code block was run against a live apfel-plus server; the output below each snippet is the real unedited stdout.
+=======
+This guide covers the canonical patterns: one-shot completion, streaming, JSON mode, error handling, tool calling, and a real text-summarization example. Every code block was run against a live apfel server; the output below each snippet is real unedited stdout.
+>>>>>>> upstream/main
 
 Runnable scripts + tests: [Arthur-Ficial/apfel-guides-lab/scripts/python](https://github.com/Arthur-Ficial/apfel-guides-lab/tree/main/scripts/python).
 
@@ -245,7 +249,11 @@ Lab script: [`06_example.py`](https://github.com/Arthur-Ficial/apfel-guides-lab/
 
 ## Tested with
 
+<<<<<<< HEAD
 - apfel-plus v1.0.3
+=======
+- apfel v1.0.3 (original capture; the CLI and HTTP surfaces used here are release-gated by apfel's test suite on every version)
+>>>>>>> upstream/main
 - macOS 26.3.1, Apple Silicon
 - Python 3.11 / openai 2.31.0
 - Date: 2026-04-16

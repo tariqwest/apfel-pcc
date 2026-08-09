@@ -31,6 +31,23 @@ struct SecurityMiddleware<Context: RequestContext>: RouterMiddleware {
                 let msg = "Origin '\(origin ?? "unknown")' is not allowed. Use --allowed-origins to configure."
                 return errorResponse(status: .forbidden, message: msg, type: "forbidden", requestOrigin: origin)
             }
+
+            // DNS-rebinding defense (#230): same-origin GETs carry no Origin, so
+            // origin checking alone cannot stop a rebound attacker domain from
+            // reading /health and /v1/models. Reject a Host header that is not a
+            // loopback name (or the bind host) when bound to loopback. A
+            // network-exposed bind (0.0.0.0) sends Host values we cannot
+            // enumerate, so this only applies to loopback binds.
+            if ServerSecurity.isLoopbackHost(config.host) {
+                // swift-http-types maps the HTTP/1 Host header to the :authority
+                // pseudo-header, exposed as HTTPRequest.authority (the "Host"
+                // field name is unavailable and never populated in headers).
+                let hostHeader = request.head.authority
+                if !ServerSecurity.isAllowedHostHeader(hostHeader, bindHost: config.host) {
+                    let msg = "Host '\(hostHeader ?? "unknown")' is not allowed."
+                    return errorResponse(status: .forbidden, message: msg, type: "forbidden", requestOrigin: origin)
+                }
+            }
         }
 
         // Token check (opt-in). /health stays public on loopback by default,

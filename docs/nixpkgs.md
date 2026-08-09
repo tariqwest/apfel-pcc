@@ -28,30 +28,63 @@ If nixpkgs' darwin stdenv later gains macOS 26 SDK support, we switch to a sourc
 
 ## How new versions land
 
-There are two eras, and `scripts/publish-nixpkgs-bump.sh` (run as the final, non-fatal step of `make release`) switches between them automatically by checking whether `arthurficial` is listed in `meta.maintainers` on nixpkgs master.
+**The pipeline: `make release` opens a build-verified bump PR on `NixOS/nixpkgs`; a nixpkgs committer merges it.** There is no zero-touch auto-merge for apfel-llm, and that is a hard architectural limit, not a gap we can close. Here is why, because it dictates everything else.
 
-### Maintainer era (target state - fully zero-touch)
+### Why r-ryantm and the merge bot cannot help (the darwin-only wall)
 
-Once [NixOS/nixpkgs#524394](https://github.com/NixOS/nixpkgs/pull/524394) lands, nobody touches anything:
+apfel-llm is `meta.platforms = [ "aarch64-darwin" ]`. The official nixpkgs update bot [`r-ryantm`](https://github.com/nix-community/nixpkgs-update) runs **only on `x86_64-linux`** and has no darwin workers, so it **refuses to evaluate** the package and **never opens a bump PR**. This is provable from the bot's own log for apfel-llm at [nixpkgs-update-logs.nix-community.org/apfel-llm](https://nixpkgs-update-logs.nix-community.org/apfel-llm/):
 
-1. **[`r-ryantm`](https://github.com/ryantm/nixpkgs-update)** (the official nixpkgs update bot) opens a bump PR within a day or two of each GitHub Release, via `passthru.updateScript = nix-update-script { }`.
-2. **`scripts/nixpkgs-automerge.sh`** finds that PR, verifies its version and SRI hash against the tarball we actually published, and comments **`@NixOS/nixpkgs-merge-bot merge`**. The [merge bot](https://github.com/NixOS/nixpkgs/blob/master/ci/README.md#nixpkgs-merge-bot) merges `pkgs/by-name/*` PRs opened by r-ryantm when the commenter maintains all touched packages and CI is green.
-3. The script runs twice daily via launchd (`~/Library/LaunchAgents/com.arthurficial.apfel-nixpkgs-automerge.plist`, logs at `~/Library/Logs/apfel-nixpkgs-automerge.log`) and once immediately as part of `make release`. It is idempotent and self-healing: it also accepts the pending NixOS org invite (required for merge-bot eligibility) and closes any legacy bump PRs of ours, which would otherwise block r-ryantm from opening its own.
+```
+error: Refusing to evaluate package 'apfel-llm-1.5.5' because it is not
+available on the requested hostPlatform:
+  hostPlatform.system = "x86_64-linux"
+  package.meta.platforms = [ "aarch64-darwin" ]
+```
 
-The merge bot only acts on PRs opened by r-ryantm or committers - our own bump PRs can never use it. That is why the maintainer era defers to r-ryantm entirely instead of opening our own PR.
+This is universal for darwin-only packages - raycast, aldente, and friends hit the exact same wall and get zero r-ryantm PRs. `passthru.updateScript` does not change it (the script runs, then the build-verify step fails on Linux).
 
-### Pre-maintainer era (legacy - active until #524394 merges)
+Because r-ryantm never opens a PR, the [nixpkgs merge bot](https://github.com/NixOS/nixpkgs/blob/master/ci/README.md#nixpkgs-merge-bot) is also out of reach: it only merges PRs **"opened by r-ryantm or a committer"**. Being the package *maintainer* (not a *committer*) lets us *comment* the merge command, but it does **not** make a PR we open ourselves merge-bot-eligible. So the only mechanism that works is to open our own PR and wait for a committer to merge it.
 
+<<<<<<< HEAD
 1. **`make release`** runs `scripts/publish-nixpkgs-bump.sh` after the GitHub Release and Homebrew tap are updated. The script forks `NixOS/nixpkgs` to `tariqwest/nixpkgs` (one-time), syncs from upstream master, edits `pkgs/by-name/ap/apfel-plus-llm/package.nix`, pushes, and opens a PR on `NixOS/nixpkgs`. Idempotent at every layer (fork, branch, PR), and **non-fatal**: a bump failure does not fail the release.
 2. **r-ryantm** and **community contributors** are the safety net if the local script is skipped.
+=======
+> We were briefly listed in a "maintainer era = fully zero-touch via r-ryantm" plan ([#524394](https://github.com/NixOS/nixpkgs/pull/524394) added us as maintainer). That plan was wrong for a darwin-only package: r-ryantm can never fire, so a `scripts/nixpkgs-automerge.sh` that waited for an r-ryantm PR (and closed our own PRs in the meantime) just deadlocked nixpkgs at 1.0.5. That script has been deleted; the self-opened PR below is the permanent pipeline, not a legacy fallback.
+
+### The pipeline (self-opened, build-verified PR)
+
+1. **`make release`** runs `scripts/publish-nixpkgs-bump.sh` after the GitHub Release and Homebrew tap are updated. It forks `NixOS/nixpkgs` to `Arthur-Ficial/nixpkgs` (one-time), syncs from upstream master, edits `pkgs/by-name/ap/apfel-llm/package.nix`, **build-verifies the result with `nix-build -A apfel-llm` on this aarch64-darwin host** (r-ryantm cannot do this; we can, because the host matches `meta.platforms`), pushes, and opens/advances one PR on `NixOS/nixpkgs`. Idempotent at every layer (fork, branch, PR) and **non-fatal**: a bump failure does not fail the release. A failed `nix-build` aborts before any PR is opened, so we never submit a broken hash.
+2. It runs **twice daily via launchd** (`~/Library/LaunchAgents/com.arthurficial.apfel-nixpkgs-bump.plist`, logs at `~/Library/Logs/apfel-nixpkgs-bump.log`) as a catch-up, keeping the single open PR pointed at the latest GitHub release even if a release run skipped the bump. The launchd job runs it through `scripts/nixpkgs-bump-cron.sh`, which classifies the outcome and emails Franz once per distinct failure - so a silent break (see "Recognizing the 2FA-compliance failure" below) can never again sit unnoticed.
+3. The PR follows nixpkgs best practice: `apfel-llm: <old> -> <new>` commit/title, touches only `pkgs/by-name`, fills the **Things done** checklist with the real aarch64-darwin build, and carries an **automation/AI disclosure** per [CONTRIBUTING.md](https://github.com/NixOS/nixpkgs/blob/master/CONTRIBUTING.md#automationai-policy). The bump commit carries **no `Assisted-by:` trailer** - a deterministic version+hash bump is exempt as standard update-script automation (the same exemption r-ryantm's own commits rely on).
+4. A **nixpkgs committer merges it** when they get to it. We can only reduce friction (clean PR, green CI, maintained package); we cannot remove the wait.
+>>>>>>> upstream/main
 
 ### One advancing PR, not one per release
 
 Each run reuses the existing open apfel-plus-llm bump PR (it force-pushes the same branch, which updates that PR in place) and closes any stragglers, so there is always **exactly one** open bump PR pointing at the latest version. Earlier the branch name embedded the version (`apfel-plus-llm-${VERSION}`), so every release opened a fresh PR and they piled up unmerged (1.3.5 / 1.3.6 / 1.3.7 / 1.3.8 were all open at once). The dedup is scoped to bump branches (`apfel-plus-llm-bump` and `apfel-plus-llm-<version>`); non-bump PRs such as `apfel-plus-llm-add-maintainer` are never touched.
 
-### Why nixpkgs lags in the pre-maintainer era
+### Why nixpkgs lags
 
+<<<<<<< HEAD
 The bump automation is not the bottleneck - it opens a correct PR on every release. The lag is **merge latency**: only nixpkgs committers can merge, and a version bump for an unmaintained, darwin-only package sits in the general queue for days to weeks. The maintainer era above removes that wait. Treat nixpkgs as the slower channel regardless: Homebrew (`brew install apfel-plus`, autobumped) and the [tariqwest tap](https://github.com/tariqwest/homebrew-tap) (pushed synchronously by `make release`) are the fast paths we fully control.
+=======
+In the normal case the bump automation is not the bottleneck - it opens a correct, build-verified PR on every release. The lag is then **merge latency**: only nixpkgs committers can merge, and a maintainer-opened bump for a darwin-only package cannot use the merge bot (the "opened by r-ryantm or a committer" rule), so it sits in the committer queue for days to weeks. Being a maintainer helps a committer merge it faster but does not remove the wait, and no automation can - it is inherent to darwin-only + non-committer. Treat nixpkgs as the slower channel: Homebrew (`brew install apfel`, autobumped) and the [Arthur-Ficial tap](https://github.com/Arthur-Ficial/homebrew-tap) (pushed synchronously by `make release`) are the fast paths we fully control.
+
+But "automation is not the bottleneck" only holds while the automation can actually reach GitHub. There is a second, nastier failure mode that once stranded nixpkgs at 1.0.5 for days while apfel shipped 1.6.0.
+
+### Recognizing the 2FA-compliance failure
+
+The NixOS org enforces secure-2FA-only. If the Arthur-Ficial GitHub account has an **SMS** 2FA factor configured, GitHub returns a 403 on **every** authenticated NixOS request - not just `gh pr create`, but **reads too** (`gh api repos/NixOS/nixpkgs`, and `gh pr list` silently returns empty). The bump then build-verifies fine, fails at PR creation, and - because the read is also blocked - even concludes no PR exists. The launchd job had no alerting, so it failed twice a day, silently, for days. Log signature:
+
+```
+GraphQL: `NixOS` requires everyone in the organization to enable two-factor
+authentication ... Please remove SMS if configured as it is not considered secure.
+```
+
+**Fix:** remove the SMS factor (GitHub Settings -> Password and authentication -> SMS/Text message -> Disable). Authenticator-app TOTP stays the compliant anchor; recovery codes live in `pass show github/recovery-codes`. Details in `~/.claude/rules/services.md`.
+
+This is now caught automatically: `scripts/publish-nixpkgs-bump.sh` probes one NixOS read up front and exits `AUTH_2FA`, and the launchd wrapper `scripts/nixpkgs-bump-cron.sh` emails Franz once per distinct failure instead of failing silently.
+>>>>>>> upstream/main
 
 ### Why the bump runs locally, not in GitHub Actions
 
@@ -62,20 +95,12 @@ We tried a release-triggered GitHub Actions workflow (`.github/workflows/bump-ni
 ## Running the bump on its own
 
 ```bash
-./scripts/publish-nixpkgs-bump.sh                   # uses .version
+./scripts/publish-nixpkgs-bump.sh                   # target = latest GitHub release
 ./scripts/publish-nixpkgs-bump.sh --version 1.3.3   # explicit (catch-up bumps)
 ./scripts/publish-nixpkgs-bump.sh --dry-run         # no fork/push/PR
 ```
 
-In the maintainer era this defers to the automerge reconciler, which can also be run directly:
-
-```bash
-./scripts/nixpkgs-automerge.sh                      # target = latest GitHub release
-./scripts/nixpkgs-automerge.sh --version 1.5.3      # explicit target
-./scripts/nixpkgs-automerge.sh --dry-run            # report, change nothing
-```
-
-Prerequisites: `nix` (for `nix-prefetch-url`), `gh` CLI logged into Arthur-Ficial, `python3`, `git`. The script verifies these and skips with a warning if anything is missing - it never blocks the release.
+Prerequisites: `nix` (for `nix-prefetch-url` and the `nix-build` verification), `gh` CLI logged into Arthur-Ficial, `python3`, `git`. The script verifies these and skips with a warning if anything is missing - it never blocks the release.
 
 The fork `Arthur-Ficial/nixpkgs` is created on first run via `gh repo fork`. The local checkout lives at `~/dev/nixpkgs-bump` (override with `NIXPKGS_BUMP_DIR`).
 

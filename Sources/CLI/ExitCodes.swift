@@ -20,6 +20,10 @@ public enum ApfelExitCodes {
     public static let contextOverflow: Int32 = 4
     public static let modelUnavailable: Int32 = 5
     public static let rateLimited: Int32 = 6
+    /// `--code` (#373): the model answered normally but the response contains
+    /// no fenced code block. Distinct from `runtimeError` so scripts can
+    /// branch on "re-prompt or fall back" vs "the run itself failed".
+    public static let noCode: Int32 = 7
 
     /// Map a classified `ApfelError` to its documented CLI exit code.
     public static func code(for error: ApfelError) -> Int32 {

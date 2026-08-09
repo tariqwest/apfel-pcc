@@ -86,6 +86,41 @@ func runInstallMethodTests() {
     }
 }
 
+func runHomebrewPrefixTests() {
+    // #260: derive the brew prefix from the resolved binary path.
+    test("Apple Silicon Cellar path -> /opt/homebrew") {
+        try assertEqual(
+            homebrewPrefix(fromBinaryPath: "/opt/homebrew/Cellar/apfel/1.6.1/bin/apfel"),
+            "/opt/homebrew")
+    }
+
+    test("Apple Silicon opt symlink path -> /opt/homebrew") {
+        try assertEqual(
+            homebrewPrefix(fromBinaryPath: "/opt/homebrew/opt/apfel/bin/apfel"),
+            "/opt/homebrew")
+    }
+
+    test("Intel Homebrew Cellar path -> /usr/local/homebrew") {
+        try assertEqual(
+            homebrewPrefix(fromBinaryPath: "/usr/local/homebrew/Cellar/apfel/1.3.5/bin/apfel"),
+            "/usr/local/homebrew")
+    }
+
+    test("Custom prefix Cellar path -> custom prefix") {
+        try assertEqual(
+            homebrewPrefix(fromBinaryPath: "/Users/me/homebrew/Cellar/apfel/1.6.1/bin/apfel"),
+            "/Users/me/homebrew")
+    }
+
+    test("Non-Homebrew path -> nil") {
+        try assertNil(homebrewPrefix(fromBinaryPath: "/usr/local/bin/apfel"))
+    }
+
+    test("Source build path -> nil") {
+        try assertNil(homebrewPrefix(fromBinaryPath: "/Users/me/dev/apfel/.build/release/apfel"))
+    }
+}
+
 private func makeTempPrefix() -> URL {
     let dir = FileManager.default.temporaryDirectory
         .appendingPathComponent("apfel-plus-install-method-\(UUID().uuidString)")

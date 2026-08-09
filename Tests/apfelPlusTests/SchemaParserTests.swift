@@ -22,8 +22,8 @@ func runSchemaParserTests() {
 
     test("parse integer primitive") {
         let ir = try SchemaParser.parse(json: #"{"type":"integer"}"#, name: "i")
-        guard case .number(let name, _) = ir else {
-            throw TestFailure("expected .number for integer, got \(ir)")
+        guard case .integer(let name, _) = ir else {
+            throw TestFailure("expected .integer for integer, got \(ir)")
         }
         try assertEqual(name, "i")
     }
@@ -33,6 +33,14 @@ func runSchemaParserTests() {
         guard case .number = ir else {
             throw TestFailure("expected .number, got \(ir)")
         }
+    }
+
+    test("integer and number parse to distinct IR cases (#243)") {
+        let intIR = try SchemaParser.parse(json: #"{"type":"integer"}"#, name: "x")
+        let numIR = try SchemaParser.parse(json: #"{"type":"number"}"#, name: "x")
+        try assertTrue(intIR != numIR, "integer and number must not collapse to the same IR")
+        guard case .integer = intIR else { throw TestFailure("expected .integer") }
+        guard case .number = numIR else { throw TestFailure("expected .number") }
     }
 
     test("parse boolean primitive") {
@@ -324,5 +332,100 @@ func runSchemaParserTests() {
         let a = try SchemaParser.parse(json: #"{"type":"object","properties":{"x":{"type":"string"}}}"#, name: "t")
         let b = try SchemaParser.parse(json: #"{"type":"object","properties":{"y":{"type":"string"}}}"#, name: "t")
         try assertTrue(a != b)
+    }
+
+    // MARK: Nullable unions / type-arrays (#219)
+
+    test("anyOf [X, null] unwraps to X") {
+        let ir = try SchemaParser.parse(json: #"{"anyOf":[{"type":"string"},{"type":"null"}]}"#, name: "s")
+        guard case .string = ir else { throw TestFailure("expected .string, got \(ir)") }
+    }
+
+    test("anyOf [null, X] (reversed order) unwraps to X") {
+        let ir = try SchemaParser.parse(json: #"{"anyOf":[{"type":"null"},{"type":"number"}]}"#, name: "n")
+        guard case .number = ir else { throw TestFailure("expected .number, got \(ir)") }
+    }
+
+    test("oneOf [X, null] unwraps to X") {
+        let ir = try SchemaParser.parse(json: #"{"oneOf":[{"type":"integer"},{"type":"null"}]}"#, name: "i")
+        guard case .integer = ir else { throw TestFailure("expected .integer, got \(ir)") }
+    }
+
+    test("type array [string, null] unwraps to string") {
+        let ir = try SchemaParser.parse(json: #"{"type":["string","null"]}"#, name: "s")
+        guard case .string = ir else { throw TestFailure("expected .string, got \(ir)") }
+    }
+
+    test("type array [null, integer] unwraps to integer") {
+        let ir = try SchemaParser.parse(json: #"{"type":["null","integer"]}"#, name: "i")
+        guard case .integer = ir else { throw TestFailure("expected .integer, got \(ir)") }
+    }
+
+    test("nullable anyOf preserves enum on the non-null branch") {
+        let ir = try SchemaParser.parse(
+            json: #"{"anyOf":[{"type":"string","enum":["a","b"]},{"type":"null"}]}"#,
+            name: "u"
+        )
+        guard case .string(_, _, let enums) = ir else { throw TestFailure("expected .string") }
+        try assertEqual(enums ?? [], ["a", "b"])
+    }
+
+    test("nullable property is optional even when listed in required") {
+        // The common Pydantic/zod Optional[str] pattern: required but nullable.
+        let json = #"""
+        {"type":"object","properties":{"unit":{"anyOf":[{"type":"string"},{"type":"null"}]}},"required":["unit"]}
+        """#
+        let ir = try SchemaParser.parse(json: json, name: "cfg")
+        guard case .object(_, _, let props) = ir else { throw TestFailure("expected .object") }
+        try assertEqual(props.count, 1)
+        try assertEqual(props[0].name, "unit")
+        try assertTrue(props[0].isOptional, "nullable property must be optional")
+        guard case .string = props[0].schema else { throw TestFailure("unit must unwrap to .string") }
+    }
+
+    test("nullable type-array property is optional even when required") {
+        let json = #"""
+        {"type":"object","properties":{"age":{"type":["integer","null"]}},"required":["age"]}
+        """#
+        let ir = try SchemaParser.parse(json: json, name: "person")
+        guard case .object(_, _, let props) = ir else { throw TestFailure("expected .object") }
+        try assertTrue(props[0].isOptional, "nullable type-array property must be optional")
+        guard case .integer = props[0].schema else { throw TestFailure("age must unwrap to .integer") }
+    }
+
+    test("anyOf of two non-null types throws unsupportedType") {
+        do {
+            _ = try SchemaParser.parse(json: #"{"anyOf":[{"type":"string"},{"type":"number"}]}"#, name: "bad")
+            throw TestFailure("expected throw")
+        } catch SchemaParser.Error.unsupportedType {
+            // expected - engages the text-injection fallback (tools) / 400 (json_schema)
+        }
+    }
+
+    test("allOf throws unsupportedType") {
+        do {
+            _ = try SchemaParser.parse(json: #"{"allOf":[{"type":"string"}]}"#, name: "bad")
+            throw TestFailure("expected throw")
+        } catch SchemaParser.Error.unsupportedType {
+            // expected
+        }
+    }
+
+    test("type array with three entries throws unsupportedType") {
+        do {
+            _ = try SchemaParser.parse(json: #"{"type":["string","number","null"]}"#, name: "bad")
+            throw TestFailure("expected throw")
+        } catch SchemaParser.Error.unsupportedType {
+            // expected
+        }
+    }
+
+    test("type array without null throws unsupportedType") {
+        do {
+            _ = try SchemaParser.parse(json: #"{"type":["string","number"]}"#, name: "bad")
+            throw TestFailure("expected throw")
+        } catch SchemaParser.Error.unsupportedType {
+            // expected
+        }
     }
 }

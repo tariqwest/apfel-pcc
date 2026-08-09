@@ -422,9 +422,9 @@ func printToolLog(_ toolLog: [ToolLogEntry]) {
     guard !quietMode else { return }
     for log in toolLog {
         if log.isError {
-            printStderr("\(styled("tool:", .red)) \(log.name) failed: \(log.result)")
+            printStderr("\(styledErr("tool:", .red)) \(log.name) failed: \(log.result)")
         } else {
-            printStderr("\(styled("tool:", .cyan)) \(log.name)(\(log.args)) = \(log.result)")
+            printStderr("\(styledErr("tool:", .cyan)) \(log.name)(\(log.args)) = \(log.result)")
         }
     }
 }
@@ -455,20 +455,55 @@ func detectAndExecuteMCPTools(
     for call in toolCalls {
         do {
             let result = try await mcpManager.execute(name: call.name, arguments: call.argumentsString)
-            resultParts.append("\(call.name): \(result)")
-            toolLog.append((name: call.name, args: call.argumentsString, result: result, isError: false))
+            if result.isError {
+                // An MCP-spec `isError: true` result is a tool-execution error
+                // (e.g. divide(1,0)). Feed it back to the model so it can see
+                // the error and recover, instead of aborting with HTTP 500 (#220).
+                resultParts.append("\(call.name): error - \(result.text)")
+                toolLog.append((name: call.name, args: call.argumentsString, result: result.text, isError: true))
+            } else {
+                resultParts.append("\(call.name): \(result.text)")
+                toolLog.append((name: call.name, args: call.argumentsString, result: result.text, isError: false))
+            }
         } catch {
-            if case .toolNotFound = error as? MCPError {
+            switch error as? MCPError {
+            // Non-fatal per-call failures: feed them back as an error result so
+            // the model can retry (unknown tool, or malformed model-emitted
+            // arguments (#241)) instead of aborting the whole request.
+            case .toolNotFound, .invalidArguments:
                 let msg = "\(error)"
                 resultParts.append("\(call.name): error - \(msg)")
                 toolLog.append((name: call.name, args: call.argumentsString, result: msg, isError: true))
-            } else {
+            default:
                 throw error
             }
         }
     }
 
     return MCPExecutionResult(toolCalls: toolCalls, resultParts: resultParts, toolLog: toolLog)
+}
+
+/// The fixed CLI follow-up prompt template with an empty tool result, used to
+/// price the prompt overhead so the tool result gets the remaining token budget.
+private func cliFollowUpOverhead(userPrompt: String, systemPrompt: String?) -> String {
+    (systemPrompt ?? "")
+        + "The user asked: \(userPrompt)\n\nThe tool returned: \n\nAnswer the user's question using this result."
+}
+
+/// Truncate a tool-result string to a token budget derived from the model's
+/// context window minus the fixed prompt overhead and an output reserve, so a
+/// large tool result cannot overflow the context (CLI) or be dropped whole by
+/// the context trimmer while the prompt still references it (server) (#221).
+func truncateToolResultToBudget(
+    _ result: String,
+    overhead: String,
+    outputReserve: Int = 512
+) async -> String {
+    let inputBudget = await TokenCounter.shared.inputBudget(reservedForOutput: outputReserve)
+    let overheadTokens = await TokenCounter.shared.count(overhead)
+    let budget = max(0, inputBudget - overheadTokens)
+    let tokens = await TokenCounter.shared.count(result)
+    return ToolOutputTruncator.truncate(result, tokenCount: tokens, budgetTokens: budget).text
 }
 
 /// CLI path: execute MCP tool calls and re-prompt with a plain follow-up session.
@@ -486,7 +521,9 @@ func executeMCPToolCallsForCLI(
 
     var aggregatedLog = executed.toolLog
     let plainSession = makeSession(systemPrompt: systemPrompt)
-    var toolResult = executed.resultParts.joined(separator: "\n")
+    let overhead = cliFollowUpOverhead(userPrompt: userPrompt, systemPrompt: systemPrompt)
+    var toolResult = await truncateToolResultToBudget(
+        executed.resultParts.joined(separator: "\n"), overhead: overhead)
     var finalContent = try await plainSession.respond(
         to: "The user asked: \(userPrompt)\n\nThe tool returned: \(toolResult)\n\nAnswer the user's question using this result.",
         options: options
@@ -504,7 +541,8 @@ func executeMCPToolCallsForCLI(
           let followUp = try await detectAndExecuteMCPTools(in: finalContent, mcpManager: mcpManager) {
         reprompts += 1
         aggregatedLog.append(contentsOf: followUp.toolLog)
-        toolResult = followUp.resultParts.joined(separator: "\n")
+        toolResult = await truncateToolResultToBudget(
+            followUp.resultParts.joined(separator: "\n"), overhead: overhead)
         finalContent = try await plainSession.respond(
             to: "The user asked: \(userPrompt)\n\nThe tool returned: \(toolResult)\n\nAnswer the user's question using this result.",
             options: options
@@ -520,45 +558,43 @@ func executeMCPToolCallsForCLI(
     return (content: finalContent, toolLog: aggregatedLog)
 }
 
-/// Remove a trailing `{"tool_calls": ...}` JSON block from model output so it
-/// never leaks to the user as raw protocol text. Mirrors the string-aware
-/// balanced-brace scan in `ToolCallHandler.extractCandidates`. If no balanced
-/// block is found, the original text (trimmed) is returned unchanged.
+/// Remove a `{"tool_calls": ...}` JSON block from model output so it never
+/// leaks to the user as raw protocol text. Implementation lives in ApfelCore
+/// (`ToolCallHandler.stripToolCallJSON`) so it is unit-testable (#358).
 func stripToolCallJSON(from text: String) -> String {
-    guard let range = text.range(of: "{\"tool_calls\"") else {
-        return text.trimmingCharacters(in: .whitespacesAndNewlines)
+    ToolCallHandler.stripToolCallJSON(from: text)
+}
+
+/// Token-budget each executed tool result for a server follow-up, given the
+/// prior conversation, so no single `role: "tool"` message exceeds the context
+/// budget and gets dropped whole by the trimmer (#221). The returned toolLog is
+/// left full elsewhere; only the prompt-bound copy is truncated.
+private func truncatedServerToolResults(
+    toolLog: [(name: String, args: String, result: String, isError: Bool)],
+    priorMessages: [OpenAIMessage]
+) async -> [(name: String, result: String)] {
+    let inputBudget = await TokenCounter.shared.inputBudget(reservedForOutput: 512)
+    let conversationText = priorMessages.compactMap { $0.textContent }.joined(separator: "\n")
+    let overheadTokens = await TokenCounter.shared.count(conversationText)
+    let perResultBudget = max(0, inputBudget - overheadTokens) / max(1, toolLog.count)
+    var out: [(name: String, result: String)] = []
+    for entry in toolLog {
+        let tokens = await TokenCounter.shared.count(entry.result)
+        let text = ToolOutputTruncator.truncate(
+            entry.result, tokenCount: tokens, budgetTokens: perResultBudget).text
+        out.append((name: entry.name, result: text))
     }
-    var depth = 0
-    var inString = false
-    var escaped = false
-    var idx = range.lowerBound
-    while idx < text.endIndex {
-        let ch = text[idx]
-        if inString {
-            if escaped { escaped = false }
-            else if ch == "\\" { escaped = true }
-            else if ch == "\"" { inString = false }
-        } else if ch == "\"" {
-            inString = true
-        } else if ch == "{" {
-            depth += 1
-        } else if ch == "}" {
-            depth -= 1
-            if depth == 0 {
-                let before = String(text[text.startIndex..<range.lowerBound])
-                let after = String(text[text.index(after: idx)...])
-                return (before + after).trimmingCharacters(in: .whitespacesAndNewlines)
-            }
-        }
-        idx = text.index(after: idx)
-    }
-    // No balanced close — drop everything from the marker onward.
-    return String(text[text.startIndex..<range.lowerBound])
-        .trimmingCharacters(in: .whitespacesAndNewlines)
+    return out
 }
 
 /// Server path: execute MCP tool calls and re-prompt with full conversation context.
 /// Appends tool call/result messages to the conversation and rebuilds a session via ContextManager.
+///
+/// Runs the same bounded re-detection loop as the CLI path (#240): if the model
+/// answers the tool-result follow-up with another `{"tool_calls": ...}` (common
+/// in tool chains), that round is executed and re-prompted, up to `maxReprompts`.
+/// On cap exhaustion any trailing tool-call JSON is stripped so it never leaks to
+/// the HTTP client as `message.content` with `finish_reason: "stop"`.
 func executeMCPToolCallsForServer(
     in content: String,
     mcpManager: MCPManager?,
@@ -571,20 +607,52 @@ func executeMCPToolCallsForServer(
         return nil
     }
 
-    let followUpMessages = appendExecutedToolResults(
-        to: messages,
-        toolCalls: executed.toolCalls,
-        toolResults: executed.toolLog.map { ($0.name, $0.result) }
-    )
-    let (followUpSession, followUpPrompt, _) = try await ContextManager.makeSession(
-        messages: followUpMessages,
-        tools: nil,
-        options: sessionOptions,
-        jsonMode: false,
-        toolChoice: nil
-    )
-    let finalContent = try await followUpSession.respond(to: followUpPrompt, options: options).content
-    return (content: finalContent, toolLog: executed.toolLog)
+    var aggregatedLog = executed.toolLog
+    var currentMessages = messages
+    var currentExecuted = executed
+    var finalContent = ""
+
+    // Mirror the CLI path's bounded loop: initial re-prompt plus up to
+    // maxReprompts further rounds when the model keeps emitting tool calls.
+    let maxReprompts = 3
+    var reprompts = 0
+    while true {
+        let truncated = await truncatedServerToolResults(
+            toolLog: currentExecuted.toolLog, priorMessages: currentMessages)
+        let followUpMessages = appendExecutedToolResults(
+            to: currentMessages,
+            toolCalls: currentExecuted.toolCalls,
+            toolResults: truncated
+        )
+        let (followUpSession, followUpPrompt, _) = try await ContextManager.makeSession(
+            messages: followUpMessages,
+            tools: nil,
+            options: sessionOptions,
+            jsonMode: false,
+            toolChoice: nil
+        )
+        finalContent = try await followUpSession.respond(to: followUpPrompt, options: options).content
+
+        // The re-prompt answer may itself request another tool call. Execute and
+        // re-prompt again with a hard cap so a model that keeps emitting
+        // tool_calls cannot spin forever.
+        guard reprompts < maxReprompts,
+              let next = try await detectAndExecuteMCPTools(in: finalContent, mcpManager: mcpManager) else {
+            break
+        }
+        reprompts += 1
+        aggregatedLog.append(contentsOf: next.toolLog)
+        currentMessages = followUpMessages
+        currentExecuted = next
+    }
+
+    // Cap exhausted but the model is still emitting a tool call: strip the raw
+    // JSON so it never reaches the client as content with finish_reason stop.
+    if ToolCallHandler.detectToolCall(in: finalContent) != nil {
+        finalContent = stripToolCallJSON(from: finalContent)
+    }
+
+    return (content: finalContent, toolLog: aggregatedLog)
 }
 
 private func appendExecutedToolResults(

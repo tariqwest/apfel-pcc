@@ -10,6 +10,9 @@ import ApfelCore
 struct ApfelResponse: Encodable {
     let model: String
     let content: String
+    /// `--code` only (#373): first word of the fence info string, lowercased.
+    /// Model-reported and advisory; omitted from JSON when nil.
+    var language: String? = nil
     let metadata: Metadata
     struct Metadata: Encodable {
         let onDevice: Bool
@@ -22,6 +25,38 @@ struct ChatMessage: Encodable {
     let role: String
     let content: String
     let model: String?
+}
+
+/// JSON output for `apfel --count-tokens -o json`.
+struct TokenBudgetJSONResponse: Encodable {
+    let prompt_tokens: Int
+    let system_tokens: Int
+    let file_tokens: [FileEntry]
+    let mcp_tool_tokens: Int
+    let total: Int
+    let budget: Int
+    let output_reserve: Int
+    let fits: Bool
+    let approximate: Bool
+    let context_size: Int
+
+    struct FileEntry: Encodable {
+        let path: String
+        let tokens: Int
+    }
+
+    init(report: TokenBudgetReport) {
+        prompt_tokens = report.promptTokens
+        system_tokens = report.systemTokens
+        file_tokens = report.fileTokens.map { FileEntry(path: $0.path, tokens: $0.tokens) }
+        mcp_tool_tokens = report.mcpToolTokens
+        total = report.total
+        budget = report.budget
+        output_reserve = report.outputReserve
+        fits = report.fits
+        approximate = report.approximate
+        context_size = report.contextSize
+    }
 }
 
 // MARK: - OpenAI Response
@@ -69,6 +104,31 @@ struct ChatCompletionChunk: Encodable, Sendable {
     let model: String
     let choices: [ChunkChoice]
     let usage: ChunkUsage?
+    /// Control flag (not a wire field). When true and `usage` is nil, the chunk
+    /// encodes `"usage": null` explicitly. OpenAI sends `usage: null` on every
+    /// non-final chunk when `stream_options.include_usage` is set; without the
+    /// opt-in a nil usage is omitted entirely (#238).
+    var includeUsageNull: Bool = false
+
+    // Custom encoder so `usage` is emitted as explicit null only when opted in,
+    // and omitted otherwise. Swift's synthesized Encodable would always drop a
+    // nil optional, losing the include_usage null-usage contract.
+    func encode(to encoder: Encoder) throws {
+        var c = encoder.container(keyedBy: CodingKeys.self)
+        try c.encode(id, forKey: .id)
+        try c.encode(object, forKey: .object)
+        try c.encode(created, forKey: .created)
+        try c.encode(model, forKey: .model)
+        try c.encode(choices, forKey: .choices)
+        if let usage = usage {
+            try c.encode(usage, forKey: .usage)
+        } else if includeUsageNull {
+            try c.encodeNil(forKey: .usage)
+        }
+    }
+    private enum CodingKeys: String, CodingKey {
+        case id, object, created, model, choices, usage
+    }
 
     struct ChunkChoice: Encodable, Sendable {
         let index: Int
@@ -122,6 +182,23 @@ struct OpenAIErrorResponse: Encodable, Sendable {
         let type: String
         let param: String?
         let code: String?
+
+        // OpenAI always emits `param` and `code` on the error object (as null
+        // when absent). Swift's synthesized Encodable omits nil optionals, so
+        // router/proxy front-ends that branch on error.code miss the key.
+        // Encode both explicitly, using null when nil (#236).
+        func encode(to encoder: Encoder) throws {
+            var c = encoder.container(keyedBy: CodingKeys.self)
+            try c.encode(message, forKey: .message)
+            try c.encode(type, forKey: .type)
+            if let param = param { try c.encode(param, forKey: .param) }
+            else { try c.encodeNil(forKey: .param) }
+            if let code = code { try c.encode(code, forKey: .code) }
+            else { try c.encodeNil(forKey: .code) }
+        }
+        private enum CodingKeys: String, CodingKey {
+            case message, type, param, code
+        }
     }
 }
 

@@ -88,6 +88,61 @@ func runCLIValidateTests() {
         }
     }
 
+    // -- validate() silent-drop guard (#370 audit): input-ignoring modes --
+
+    test("validate() rejects a positional prompt in serve mode") {
+        var a = CLIArguments(); a.mode = .serve; a.prompt = "hello"
+        do { try a.validate(); try assertTrue(false, "should have thrown") }
+        catch let e as CLIParseError { try assertTrue(e.message.contains("positional prompt")) }
+    }
+
+    test("validate() rejects -f file content in benchmark mode") {
+        var a = CLIArguments(); a.mode = .benchmark; a.fileContents = ["some file"]
+        do { try a.validate(); try assertTrue(false, "should have thrown") }
+        catch let e as CLIParseError { try assertTrue(e.message.contains("file")) }
+    }
+
+    test("validate() rejects -s/--system in serve mode") {
+        var a = CLIArguments(); a.mode = .serve; a.systemPrompt = "be terse"
+        do { try a.validate(); try assertTrue(false, "should have thrown") }
+        catch let e as CLIParseError { try assertTrue(e.message.contains("system")) }
+    }
+
+    test("validate() rejects generation tuning in model-info mode") {
+        var a = CLIArguments(); a.mode = .modelInfo; a.temperature = 0.5
+        do { try a.validate(); try assertTrue(false, "should have thrown") }
+        catch let e as CLIParseError { try assertTrue(e.message.contains("temperature")) }
+    }
+
+    test("validate() rejects --seed in update mode") {
+        var a = CLIArguments(); a.mode = .update; a.seed = 7
+        do { try a.validate(); try assertTrue(false, "should have thrown") }
+        catch let e as CLIParseError { try assertTrue(e.message.contains("seed")) }
+    }
+
+    test("validate() rejects --context-status outside chat") {
+        var a = CLIArguments(); a.mode = .single; a.contextStatus = true
+        do { try a.validate(); try assertTrue(false, "should have thrown") }
+        catch let e as CLIParseError { try assertTrue(e.message.contains("context-status")) }
+    }
+
+    // -- validate() still allows the legitimate combinations --
+
+    test("validate() allows --context-status in chat mode") {
+        var a = CLIArguments(); a.mode = .chat; a.contextStatus = true
+        try a.validate()
+    }
+
+    test("validate() allows serve mode with server-consumed flags") {
+        var a = CLIArguments(); a.mode = .serve; a.permissive = true; a.retryEnabled = true
+        try a.validate()
+    }
+
+    test("validate() still allows a prompt and tuning in single mode") {
+        var a = CLIArguments(); a.mode = .single; a.prompt = "hello"; a.temperature = 0.5; a.seed = 3
+        try a.validate()
+    }
+
     // -- parse() end-to-end still works: parse() should internally invoke validate() --
 
     test("parse() still throws on mode conflicts (parse internally calls validate)") {

@@ -41,3 +41,24 @@ public func detectInstallMethod(
 
     return .source
 }
+
+/// Derive the Homebrew prefix from a resolved apfel binary path.
+///
+/// For a Cellar install `<prefix>/Cellar/apfel/<version>/bin/apfel` or an opt
+/// symlink `<prefix>/opt/apfel/bin/apfel`, returns `<prefix>` - e.g.
+/// `/opt/homebrew` (Apple Silicon default), `/usr/local` (Intel default), or a
+/// custom prefix such as `/Users/me/homebrew`. `brew` and the installed `apfel`
+/// then live at `<prefix>/bin/brew` and `<prefix>/bin/apfel`.
+///
+/// Returns nil when the path is not a recognizable Homebrew layout, so callers
+/// can fall back to locating `brew` on `PATH` instead of hardcoding a prefix
+/// (#260).
+public func homebrewPrefix(fromBinaryPath path: String) -> String? {
+    for marker in ["/Cellar/apfel/", "/opt/apfel/"] {
+        if let range = path.range(of: marker) {
+            let prefix = String(path[path.startIndex..<range.lowerBound])
+            return prefix.isEmpty ? nil : prefix
+        }
+    }
+    return nil
+}

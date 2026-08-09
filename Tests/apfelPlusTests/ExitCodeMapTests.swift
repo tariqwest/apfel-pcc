@@ -58,5 +58,6 @@ func runExitCodeMapTests() {
         try assertEqual(ApfelExitCodes.contextOverflow, 4)
         try assertEqual(ApfelExitCodes.modelUnavailable, 5)
         try assertEqual(ApfelExitCodes.rateLimited, 6)
+        try assertEqual(ApfelExitCodes.noCode, 7)
     }
 }

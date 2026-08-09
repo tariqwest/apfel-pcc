@@ -4,7 +4,11 @@ apfel-plus natively speaks the [https://modelcontextprotocol.io/](https://modelc
 
 All inference runs on-device with no network calls for the LLM itself. Optional remote MCP tool servers (`--mcp https://...`) do make network calls for tool arguments.
 
+<<<<<<< HEAD
 > **Ready-made MCPs for apfel-plus**: [apfel-plus-mcp.franzai.com](https://apfel-plus-mcp.franzai.com/) ships three token-budget-optimized MCP servers designed specifically for apfel-plus's 4096-token context window: `url-fetch`, `ddg-search`, and the flagship compound `search-and-fetch` tool. Install with `brew install tariqwest/tap/apfel-plus-mcp`. Repo is open for contributions of new apfel-plus-optimized MCPs.
+=======
+> **Ready-made MCPs for apfel**: [apfel-mcp.franzai.com](https://apfel-mcp.franzai.com/) ships three token-budget-optimized MCP servers for apfel's small on-device context window (4096 tokens on macOS 26, 8192 on macOS 27): `url-fetch`, `ddg-search`, and the flagship compound `search-and-fetch` tool. Details in [Ready-made MCPs](#ready-made-mcps) below.
+>>>>>>> upstream/main
 
 ## Quick start
 
@@ -53,7 +57,11 @@ apfel-run "What is 15 times 27?"    # same as apfel-plus + all enabled MCPs
 apfel-run --list                    # see what's on / off
 ```
 
+<<<<<<< HEAD
 This keeps apfel-plus itself flag-only - the registry layer lives in its own 200-LOC wrapper.
+=======
+This keeps apfel itself flag-only - the registry layer lives in its own wrapper.
+>>>>>>> upstream/main
 
 ## Remote MCP servers
 
@@ -217,7 +225,7 @@ apfel-plus --mcp ./my-tool.py "question that needs the tool"
 
 ## Limitations
 
-- **4096 token context window.** Tool definitions, question, tool result, and final answer must all fit.
+- **Small context window (4096 tokens on macOS 26, 8192 on macOS 27 - read at runtime).** Tool definitions, question, tool result, and final answer must all fit.
 - **One tool call per turn.** Multi-tool chains require multiple round trips.
 - **No guaranteed schema compliance.** The model follows schemas loosely. Your server must handle unexpected argument formats.
 - **No streaming for tool calls.** Tool call responses are always non-streaming.
@@ -240,9 +248,18 @@ See `mcp/calculator/server.py` for a complete working example.
 
 ## Ready-made MCPs
 
+<<<<<<< HEAD
 - [apfel-plus-mcp.franzai.com](https://apfel-plus-mcp.franzai.com/) - three token-budget-optimized MCP servers for apfel-plus's 4096-token context window:
   - `apfel-plus-mcp-url-fetch` - fetch a URL, extract the main article with Readability, return clean Markdown. SSRF blocklist, 6000-char hard cap.
   - `apfel-plus-mcp-ddg-search` - DuckDuckGo web search via direct HTML scrape. No API key. 2000-char hard cap.
   - `apfel-plus-mcp-search-and-fetch` - the flagship compound tool. Searches AND fetches the top N result pages in ONE tool call. Saves ~500 tokens of schema/state overhead vs chaining separate tools. Declared as both `search` and `web_search` so the 3B model's hallucinated tool names still route correctly.
   - Install with `brew install tariqwest/tap/apfel-plus-mcp`
   - Repo: [github.com/Arthur-Ficial/apfel-mcp](https://github.com/Arthur-Ficial/apfel-mcp) - open for contributions of new apfel-plus-optimized MCPs. See [apfel-plus-mcp.franzai.com/#contribute](https://apfel-plus-mcp.franzai.com/#contribute) for the rules and idea list.
+=======
+- [apfel-mcp.franzai.com](https://apfel-mcp.franzai.com/) - three token-budget-optimized MCP servers for apfel's small on-device context window:
+  - `apfel-mcp-url-fetch` - fetch a URL, extract the main article with Readability, return clean Markdown. SSRF blocklist, 6000-char hard cap.
+  - `apfel-mcp-ddg-search` - DuckDuckGo web search via direct HTML scrape. No API key. 2000-char hard cap.
+  - `apfel-mcp-search-and-fetch` - the flagship compound tool. Searches AND fetches the top N result pages in ONE tool call. Saves ~500 tokens of schema/state overhead vs chaining separate tools. Declared as both `search` and `web_search` so the 3B model's hallucinated tool names still route correctly.
+  - Install with `brew install Arthur-Ficial/tap/apfel-mcp`
+  - Repo: [github.com/Arthur-Ficial/apfel-mcp](https://github.com/Arthur-Ficial/apfel-mcp) - open for contributions of new apfel-optimized MCPs. See [apfel-mcp.franzai.com/#contribute](https://apfel-mcp.franzai.com/#contribute) for the rules and idea list.
+>>>>>>> upstream/main

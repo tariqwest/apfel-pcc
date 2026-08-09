@@ -39,7 +39,7 @@ func runBenchmarks() async throws {
     let report = try await benchmarkReport()
     switch outputFormat {
     case .json:
-        print(jsonString(report, pretty: false), terminator: "")
+        print(jsonString(report, pretty: false))
     case .plain:
         print("""
         \(styled("apfel-plus", .cyan, .bold)) v\(report.version) — benchmark report
@@ -95,7 +95,11 @@ private func benchmarkReport() async throws -> BenchmarkReport {
         environment: BenchmarkEnvironment(
             model: modelName,
             context_window: await TokenCounter.shared.contextSize,
-            token_counter_available: await TokenCounter.shared.isAvailable
+            // Tokenizer availability, NOT generation availability: on macOS
+            // 26.0-26.3 with Apple Intelligence on, the model generates fine
+            // but every count in this report is chars/4 - the field must say
+            // so instead of repeating the pre-#315 lie on this surface (#325).
+            token_counter_available: await TokenCounter.shared.isTokenCountingAvailable
         ),
         benchmarks: [
             textExtraction,

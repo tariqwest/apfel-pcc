@@ -2,7 +2,7 @@
 
 Real-world shell scripts powered by Apple Intelligence via `apfel-plus`.
 
-All demos work within the 4096-token context window - small input, small output, instant results.
+All demos work within the on-device context window (4096 tokens on macOS 26, 8192 on macOS 27 - read at runtime) - small input, small output, instant results.
 
 ## cmd
 

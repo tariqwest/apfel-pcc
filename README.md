@@ -2,7 +2,11 @@
 
 ### The free AI already on your Mac.
 
+<<<<<<< HEAD
 [![Version 1.6.0](https://img.shields.io/badge/version-1.6.0-blue)](https://github.com/tariqwest/apfel-plus)
+=======
+[![Version 1.9.1](https://img.shields.io/badge/version-1.9.1-blue)](https://github.com/Arthur-Ficial/apfel)
+>>>>>>> upstream/main
 [![Swift 6.3+](https://img.shields.io/badge/Swift-6.3%2B-F05138?logo=swift&logoColor=white)](https://swift.org)
 [![macOS 26 Tahoe+](https://img.shields.io/badge/macOS-26%20Tahoe%2B-000000?logo=apple&logoColor=white)](https://developer.apple.com/macos/)
 [![No Xcode Required](https://img.shields.io/badge/Xcode-not%20required-orange)](https://developer.apple.com/xcode/resources/)
@@ -20,7 +24,11 @@ Apple Silicon Macs ship a built-in LLM via [Apple FoundationModels](https://deve
 
 `apfel-plus --chat` - interactive REPL.
 
+<<<<<<< HEAD
 Tool calling works in all contexts. Context: 4096 tokens on-device, 32K with `--pcc`.
+=======
+Tool calling works in all contexts. On-device context window: 4096 tokens on macOS 26, 8192 on macOS 27 - read at runtime, see [Limitations](#limitations).
+>>>>>>> upstream/main
 
 ![apfel-plus CLI](screenshots/cli.png)
 
@@ -74,11 +82,31 @@ apfel-plus -f README.md "Summarize this project"
 # Attach multiple files
 apfel-plus -f old.swift -f new.swift "What changed between these two files?"
 
+# Attach a PDF or image - on-device text extraction, OCR, and "what the image is about"
+apfel -f report.pdf "Summarize the key findings"
+apfel -f receipt.jpg "What is the total?"
+
+# Pipe a file straight in (PDF, image, or text)
+cat report.pdf | apfel "Summarize this"
+
 # Combine files with piped input
 git diff HEAD~1 | apfel-plus -f CONVENTIONS.md "Review this diff against our conventions"
 
+# Only the code - no prose, no markdown fences (pipe-safe, exit 7 if empty)
+apfel --code "a python function that deduplicates a list" > dedupe.py
+apfel --code "shell one-liner to find the 10 largest files here" | pbcopy
+
 # JSON output for scripting
 apfel-plus -o json "Translate to German: hello" | jq .content
+
+# Guaranteed schema-valid JSON output (guided generation)
+apfel --schema person.schema.json "Extract the person: Alice is 30." | jq .name
+
+# One-shot multi-turn: conversation JSON in, next assistant turn out
+jq '. += [{"role":"user","content":"and in German?"}]' conv.json | apfel --messages -
+
+# Preflight token budget before a large prompt
+apfel --count-tokens -f README.md "Summarize this"
 
 # System prompt
 apfel-plus -s "You are a pirate" "What is recursion?"
@@ -140,24 +168,23 @@ Ctrl-C exits. Context is trimmed automatically ([docs/context-strategies.md](doc
 
 ## Demos
 
-Real-world shell scripts that wrap `apfel`. They are bundled inside the binary, so you can write them out wherever you installed apfel from (homebrew-core, the tap, or source) - no repo clone needed:
+Real shell scripts that wrap `apfel`: `cmd` (English to shell command), `oneliner`, `mac-narrator`, `wtd`, `explain`, `naming`, `port`, `gitsum`. They are bundled in the binary - no repo clone. Write them out wherever you installed apfel from (homebrew-core, the tap, or source):
 
 ```bash
 apfel demos ./apfel-demos
 ```
 
-That writes every demo (executable) into `./apfel-demos`, plus a `README.md` describing each. Re-run after `brew upgrade apfel` to refresh them. The same scripts also live in [`demo/`](./demo/) in this repo.
-
-**[cmd](./demo/cmd)** - natural language to shell command:
+That writes every demo (executable) plus a `README.md` into `./apfel-demos`. Then run them from there:
 
 ```bash
-demo/cmd "find all .log files modified today"
+./apfel-demos/cmd "find all .log files modified today"
 # $ find . -name "*.log" -type f -mtime -1
 
-demo/cmd -x "show disk usage sorted by size"   # -x = execute after confirm
-demo/cmd -c "list open ports"                   # -c = copy to clipboard
+./apfel-demos/cmd -x "show disk usage sorted by size"   # -x = execute after confirm
+./apfel-demos/cmd -c "list open ports"                   # -c = copy to clipboard
 ```
 
+<<<<<<< HEAD
 **Shell function version** - add to your `.zshrc` and use `cmd` from anywhere:
 
 ```bash
@@ -199,6 +226,9 @@ Also in `demo/`:
 - **[gitsum](./demo/gitsum)** - summarize recent git activity
 
 Longer walkthroughs: [docs/demos.md](docs/demos.md).
+=======
+Re-run `apfel demos` after `brew upgrade apfel` to refresh. Sources: [`demo/`](./demo/). Walkthroughs and a copy-paste `cmd` shell function for your `.zshrc`: [docs/demos.md](docs/demos.md).
+>>>>>>> upstream/main
 
 ## MCP Tool Support
 
@@ -209,7 +239,7 @@ apfel-plus --mcp ./mcp/calculator/server.py "What is 15 times 27?"
 ```
 
 ```
-mcp: ./mcp/calculator/server.py - add, subtract, multiply, divide, sqrt, power    ← stderr
+mcp: ./mcp/calculator/server.py - add, subtract, multiply, divide, sqrt, power, round_number    ← stderr
 tool: multiply({"a": 15, "b": 27}) = 405                                          ← stderr
 15 times 27 is 405.                                                                ← stdout
 ```
@@ -255,6 +285,7 @@ alias apfel-plus=apfel-run                 # optional, every apfel-plus flag sti
 | Feature | Status | Notes |
 |---------|--------|-------|
 | `POST /v1/chat/completions` | Supported | Streaming + non-streaming |
+| `POST /v1/responses` | Supported | OpenAI Responses API: string/message input, `instructions`, streaming (canonical event sequence), `text.format` (incl. `json_schema`), function tools (non-streaming). Stateful features (`previous_response_id`, `store: true`, `background`, `reasoning`, hosted tools) return honest 501s |
 | `GET /v1/models` | Supported | Returns `apple-foundationmodel` |
 | `GET /health` | Supported | Model availability, context window, languages |
 | `GET /v1/logs`, `/v1/logs/stats` | Debug only | Requires `--debug` |
@@ -276,9 +307,9 @@ Full API spec: [openai/openai-openapi](https://github.com/openai/openai-openapi)
 
 ## Default response cap (`max_tokens`)
 
-When `max_tokens` is omitted, **CLI and OpenAI-compatible server behave identically**: the value flows through as `nil` and the model uses whatever room is left in the 4096-token context window. This is drop-in OpenAI semantics - no arbitrary fallback constant.
+When `max_tokens` is omitted, **CLI and OpenAI-compatible server behave identically**: the value flows through as `nil` and the model uses whatever room is left in the context window. This is drop-in OpenAI semantics - no arbitrary fallback constant.
 
-The on-device model has a **4096-token context window** that holds input *and* output combined. If generation runs into the ceiling, the response ends cleanly with `finish_reason: "length"` and the partial content is returned (server: HTTP 200; CLI: exit 0 with a stderr warning). Pass `max_tokens` explicitly when you want a tighter latency budget or a known cap for your client.
+The on-device context window holds input *and* output combined: **4096 tokens on macOS 26, 8192 on macOS 27**. apfel reads the real size at runtime via `SystemLanguageModel.contextSize` - check yours with `apfel --model-info`. If generation runs into the ceiling, the response ends cleanly with `finish_reason: "length"` and the partial content is returned (server: HTTP 200; CLI: exit 0 with a stderr warning). Pass `max_tokens` explicitly when you want a tighter latency budget or a known cap for your client.
 
 ### Examples
 
@@ -306,7 +337,7 @@ curl -sS http://localhost:11434/v1/chat/completions \
 | Long paragraph / structured JSON       | 1024 - 2048   |
 | As long as the context window allows   | omit it       |
 
-Keep `input_tokens + max_tokens` comfortably below 4096. If the prompt itself exceeds the window, generation cannot start and the request fails with `[context overflow]` (HTTP 400 / CLI exit 4). The validator rejects non-positive values (`max_tokens <= 0`).
+Keep `input_tokens + max_tokens` comfortably below the context window (4096 tokens on macOS 26, 8192 on macOS 27). If the prompt itself exceeds the window, generation cannot start and the request fails with `[context overflow]` (HTTP 400 / CLI exit 4). The validator rejects non-positive values (`max_tokens <= 0`).
 
 ### CLI parity
 
@@ -330,7 +361,7 @@ apfel-plus --serve --permissive             # every request uses permissive guar
 
 | Constraint | Detail |
 |------------|--------|
-| Context window | **4096 tokens** (input + output combined) |
+| Context window | **4096 tokens on macOS 26, 8192 on macOS 27** (input + output combined). Not a hardcoded constant - apfel reads `SystemLanguageModel.contextSize` at runtime; `apfel --model-info` prints the live value |
 | Platform | macOS 26+, Apple Silicon only |
 | Model | One model (`apple-foundationmodel`, ~3B params on-device), not configurable |
 | Guardrails | Apple's safety system may block benign prompts. `--permissive` reduces false positives ([docs/PERMISSIVE.md](docs/PERMISSIVE.md)) |
@@ -359,6 +390,7 @@ Guides to use apfel-plus from [Python](docs/guides/python.md), [Node.js](docs/gu
 
 - [docs/install.md](docs/install.md) - install, troubleshooting, and Apple Intelligence setup
 - [docs/cli-reference.md](docs/cli-reference.md) - every flag, exit code, and environment variable
+- [docs/file-extraction.md](docs/file-extraction.md) - `-f` and piped PDF / image / text extraction (OCR + image understanding)
 - [docs/background-service.md](docs/background-service.md) - `brew services` and launchd usage
 - [docs/openai-api-compatibility.md](docs/openai-api-compatibility.md) - `/v1/*` support matrix in depth
 - [docs/server-security.md](docs/server-security.md) - origin checks, CORS, tokens, and `--footgun`
@@ -383,7 +415,11 @@ HTTP Server (/v1/*) ───────┘   (100% on-device, zero network)
                                 TokenCounter → real token counts (SDK 26.4)
 ```
 
+<<<<<<< HEAD
 Swift 6.3 strict concurrency. Three targets: `ApfelCore` (pure logic, unit-testable, also available as a Swift Package product - see [docs/swift-library.md](docs/swift-library.md)), `apfel-plus` (CLI + server), and `apfel-plus-tests` (pure Swift runner, no XCTest).
+=======
+Swift 6.3 strict concurrency. Three targets: `ApfelCore` (pure logic, unit-testable, also available as a Swift Package product - linked under Reference Docs above), `apfel` (CLI + server), and `apfel-tests` (pure Swift runner, no XCTest).
+>>>>>>> upstream/main
 
 ## Build & Test
 
@@ -415,11 +451,19 @@ Projects built on apfel-plus. Each ships as its own repo + Homebrew formula.
 | [**apfel-clip**](https://apfel-clip.franzai.com) | Menu-bar AI actions on the clipboard: summarize, translate, rewrite. | `brew install tariqwest/tap/apfel-plus-clip` |
 | [**apfel-plus-quick**](https://apfel-plus-quick.franzai.com) | Instant AI overlay: press a key, ask, answer, dismiss. | `brew install tariqwest/tap/apfel-plus-quick` |
 | [**apfelpad**](https://apfelpad.franzai.com) | Formula notepad - on-device AI as an inline cell function. | `brew install Arthur-Ficial/tap/apfelpad` |
+<<<<<<< HEAD
 | [**apfel-plus-mcp**](https://apfel-plus-mcp.franzai.com) | Token-budget-optimized MCPs for the 4096 window: `url-fetch`, `ddg-search`, `search-and-fetch`. | `brew install tariqwest/tap/apfel-plus-mcp` |
 | [**apfel-gui**](https://github.com/Arthur-Ficial/apfel-gui) | SwiftUI debug inspector: request timeline, MCP protocol viewer, TTS/STT. | `brew install tariqwest/tap/apfel-plus-gui` |
 | [**apfel-run**](https://github.com/Arthur-Ficial/apfel-run) | UNIX wrapper adding a persistent MCP registry + TOML config on top of `apfel-plus`. | `brew install tariqwest/tap/apfel-plus-run` |
 | [**apfel-plus-tag**](https://github.com/tariqwest/apfel-plus-tag) | On-device content tagging CLI: pipe text in, get tags/topics/emotions out. | `brew install tariqwest/tap/apfel-plus-tag` |
 | [**apfel-plus-server-kit**](https://github.com/tariqwest/apfel-plus-server-kit) | Swift package for ecosystem tools: discover, spawn, and stream from a local `apfel-plus --serve`. | Swift Package |
+=======
+| [**apfel-mcp**](https://apfel-mcp.franzai.com) | Token-budget-optimized MCPs for the small on-device window: `url-fetch`, `ddg-search`, `search-and-fetch`. | `brew install Arthur-Ficial/tap/apfel-mcp` |
+| [**apfel-gui**](https://github.com/Arthur-Ficial/apfel-gui) | SwiftUI debug inspector: request timeline, MCP protocol viewer, TTS/STT. | `brew install Arthur-Ficial/tap/apfel-gui` |
+| [**apfel-run**](https://github.com/Arthur-Ficial/apfel-run) | UNIX wrapper adding a persistent MCP registry + TOML config on top of `apfel`. | `brew install Arthur-Ficial/tap/apfel-run` |
+| [**apfel-tag**](https://github.com/Arthur-Ficial/apfel-tag) | On-device content tagging CLI: pipe text in, get tags/topics/emotions out. | `brew install Arthur-Ficial/tap/apfel-tag` |
+| [**apfel-server-kit**](https://github.com/Arthur-Ficial/apfel-server-kit) | Swift package for ecosystem tools: discover, spawn, and stream from a local `apfel --serve`. | Swift Package |
+>>>>>>> upstream/main
 
 ## Community Projects
 

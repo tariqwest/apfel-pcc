@@ -111,6 +111,55 @@ def ensure_default_server():
         yield
 
 
+# MARK: - Host header validation (DNS-rebinding defense, #230)
+
+def test_foreign_host_header_rejected():
+    """A foreign Host header (rebinding attacker domain) is rejected (#230)."""
+    resp = httpx.get(
+        f"{BASE_URL}/v1/models",
+        headers={"Host": "attacker.com"},
+        timeout=10,
+    )
+    assert resp.status_code == 403
+    assert "Host" in resp.json()["error"]["message"]
+
+
+def test_foreign_host_header_rejected_on_health():
+    """Rebinding must not reach /health either (#230)."""
+    resp = httpx.get(
+        f"{BASE_URL}/health",
+        headers={"Host": "attacker.com"},
+        timeout=10,
+    )
+    assert resp.status_code == 403
+
+
+def test_localhost_host_header_allowed():
+    """The normal localhost Host header (with port) is accepted (#230)."""
+    resp = httpx.get(
+        f"{BASE_URL}/v1/models",
+        headers={"Host": "localhost:11434"},
+        timeout=10,
+    )
+    assert resp.status_code == 200
+
+
+def test_127_host_header_allowed():
+    """127.0.0.1 Host header is accepted (#230)."""
+    resp = httpx.get(
+        f"{BASE_URL}/v1/models",
+        headers={"Host": "127.0.0.1:11434"},
+        timeout=10,
+    )
+    assert resp.status_code == 200
+
+
+def test_default_host_header_allowed():
+    """The default (httpx-set) Host header must pass - standing suite stays green."""
+    resp = httpx.get(f"{BASE_URL}/v1/models", timeout=10)
+    assert resp.status_code == 200
+
+
 # MARK: - Origin Check (default: localhost only)
 
 def test_no_origin_header_allowed():
@@ -326,6 +375,56 @@ def test_token_auto_prints_generated_secret():
         banner = read_log(log_path)
     assert "token:    required" in banner
     assert re.search(r"token: [0-9A-Fa-f-]{36}", banner)
+
+
+def test_no_origin_check_shows_loud_warning_without_cors():
+    """--no-origin-check alone must fire the loud multi-line warning (#232)."""
+    with running_server("--no-origin-check") as (_, log_path):
+        banner = read_log(log_path)
+    assert "WARNING" in banner
+    assert "Any website can access this server" in banner
+
+
+def test_footgun_still_shows_loud_warning():
+    """--footgun (no origin check + CORS) keeps the loud warning (#232 regression)."""
+    with running_server("--footgun") as (_, log_path):
+        banner = read_log(log_path)
+    assert "WARNING" in banner
+    assert "footgun" in banner
+    assert "Any website can access this server" in banner
+
+
+def test_default_server_has_no_origin_warning():
+    """Default (origin check on) must NOT print the loud warning (#232)."""
+    with running_server() as (_, log_path):
+        banner = read_log(log_path)
+    assert "Any website can access this server" not in banner
+
+
+def test_non_loopback_bind_without_token_warns_loudly():
+    """0.0.0.0 with no token must fire a loud red banner pointing at --token (#228)."""
+    with running_server(bind_host="0.0.0.0") as (_, log_path):
+        banner = read_log(log_path)
+    assert "WARNING" in banner
+    assert "NO token" in banner
+    assert "--token" in banner
+    assert "docs/server-security.md" in banner
+
+
+def test_non_loopback_bind_with_token_has_no_exposure_warning():
+    """0.0.0.0 WITH a token must not print the exposed-without-token warning (#228)."""
+    with running_server(
+        "--token", "secret123", bind_host="0.0.0.0", ready_statuses=(401,)
+    ) as (_, log_path):
+        banner = read_log(log_path)
+    assert "NO token" not in banner
+
+
+def test_loopback_bind_without_token_has_no_exposure_warning():
+    """Default loopback bind without a token must not print the #228 warning."""
+    with running_server() as (_, log_path):
+        banner = read_log(log_path)
+    assert "NO token" not in banner
 
 
 def test_unauthorized_error_keeps_cors_for_allowed_origin():

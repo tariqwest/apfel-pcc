@@ -13,6 +13,15 @@ import pytest
 import openai
 import httpx
 
+from conftest import GUARDRAIL_SEEDS
+
+# Whole-suite marker: these tests drive real on-device generation (or, for
+# the permit/benchmark suites, need Apple Intelligence up); GitHub CI cannot
+# run them (CLAUDE.md "What GitHub CI CANNOT run"). Keeps -m "not model" a
+# complete, correct model-free selector for the fast preflight phase (#374).
+pytestmark = pytest.mark.model
+
+
 BASE_URL = "http://localhost:11434/v1"
 MODEL = "apple-foundationmodel"
 
@@ -71,6 +80,10 @@ def test_health_supported_languages_populated():
         "disabled or SystemLanguageModel.supportedLanguages changed."
     )
     assert "en" in langs, f"expected 'en' in supported_languages, got {langs}"
+    # #329: the SDK reports locale variants (en_US, en_GB, en_AU...) that all
+    # collapse to the same bare code; the list must be deduplicated.
+    dupes = {l for l in langs if langs.count(l) > 1}
+    assert not dupes, f"duplicate entries in supported_languages: {sorted(dupes)} in {langs}"
 
 
 # MARK: - Basic Completions
@@ -168,13 +181,23 @@ def test_tool_calling():
             }
         }
     }]
-    resp = client.chat.completions.create(
-        model=MODEL,
-        messages=[{"role": "user", "content": "Use the provided weather function for Vienna. Do not answer directly."}],
-        tools=tools,
-        tool_choice={"type": "function", "function": {"name": "get_weather"}},
-        seed=1,
-    )
+    # Seed-rotated (#324): a guardrail refusal arrives as finish_reason "stop"
+    # with tool_calls None, which would crash len(None) instead of failing clean.
+    resp = None
+    for seed in GUARDRAIL_SEEDS:
+        resp = client.chat.completions.create(
+            model=MODEL,
+            messages=[{"role": "user", "content": "Use the provided weather function for Vienna. Do not answer directly."}],
+            tools=tools,
+            tool_choice={"type": "function", "function": {"name": "get_weather"}},
+            seed=seed,
+        )
+        if resp.choices[0].finish_reason == "tool_calls" and resp.choices[0].message.tool_calls:
+            break
+    else:
+        pytest.fail(
+            f"no tool_calls on any seed {GUARDRAIL_SEEDS}; last finish_reason="
+            f"{resp.choices[0].finish_reason!r}, content={resp.choices[0].message.content!r}")
     assert resp.choices[0].finish_reason == "tool_calls"
     assert len(resp.choices[0].message.tool_calls) > 0
     assert resp.choices[0].message.tool_calls[0].function.name == "get_weather"
@@ -201,6 +224,89 @@ def test_tool_round_trip_tool_last():
     assert data["choices"][0]["message"]["content"] is not None
 
 
+def test_streaming_tool_call_no_content_leak():
+    """stream=True with client tools: the client must NEVER receive the raw
+    tool-call JSON as content deltas, and finish_reason must ride in a chunk
+    SEPARATE from the tool_calls delta (OpenAI parity).
+
+    Regression guard for #224: the streaming path forwarded every model delta as
+    delta.content, so clients saw `{"tool_calls":[{"id":"call_1"...` as assistant
+    text and then a tool_calls chunk that also bundled finish_reason.
+    """
+    tools = [{
+        "type": "function",
+        "function": {
+            "name": "get_weather",
+            "description": "Get the current weather for a city",
+            "parameters": {
+                "type": "object",
+                "properties": {"city": {"type": "string"}},
+                "required": ["city"],
+            },
+        },
+    }]
+    def collect(seed):
+        content = ""
+        tool_call_chunks = []       # chunks whose delta carries tool_calls
+        finish_reasons = []         # (has_tool_calls, finish_reason) per chunk
+        with httpx.stream(
+            "POST",
+            "http://localhost:11434/v1/chat/completions",
+            json={
+                "model": MODEL,
+                "messages": [{"role": "user", "content": "Use the provided weather function for Vienna. Do not answer directly."}],
+                "tools": tools,
+                "tool_choice": {"type": "function", "function": {"name": "get_weather"}},
+                "seed": seed,
+                "stream": True,
+            },
+            timeout=60,
+        ) as resp:
+            for line in resp.iter_lines():
+                if not line.startswith("data: "):
+                    continue
+                data = line[6:]
+                if data.strip() == "[DONE]":
+                    break
+                chunk = json.loads(data)
+                if not chunk["choices"]:
+                    continue
+                delta = chunk["choices"][0]["delta"]
+                fr = chunk["choices"][0]["finish_reason"]
+                if delta.get("content"):
+                    content += delta["content"]
+                if delta.get("tool_calls"):
+                    tool_call_chunks.append(chunk)
+                    # The tool_calls delta chunk itself must NOT carry finish_reason.
+                    assert fr is None, \
+                        f"tool_calls delta chunk must not bundle finish_reason; got {fr!r}"
+                finish_reasons.append((bool(delta.get("tool_calls")), fr))
+        return content, tool_call_chunks, finish_reasons
+
+    # Seed-rotated (#324): a guardrail refusal streams plain content with no
+    # tool_calls delta, which is not the property under test.
+    content, tool_call_chunks, finish_reasons = "", [], []
+    for seed in GUARDRAIL_SEEDS:
+        content, tool_call_chunks, finish_reasons = collect(seed)
+        if tool_call_chunks:
+            break
+    else:
+        pytest.fail(
+            f"no tool_calls delta on any seed {GUARDRAIL_SEEDS}; last content: {content!r}")
+
+    # No raw tool-call JSON must have been streamed as content.
+    assert "tool_calls" not in content, \
+        f"raw tool_calls JSON leaked as content deltas: {content!r}"
+    # A proper tool_calls delta must have been emitted.
+    assert tool_call_chunks, "no tool_calls delta chunk was emitted"
+    tc = tool_call_chunks[0]["choices"][0]["delta"]["tool_calls"][0]
+    assert tc["function"]["name"] == "get_weather"
+    # finish_reason=tool_calls must arrive in a SEPARATE chunk with no tool_calls.
+    tool_calls_finish = [fr for has_tc, fr in finish_reasons if fr == "tool_calls" and not has_tc]
+    assert tool_calls_finish, \
+        "finish_reason=tool_calls must arrive in its own empty-delta chunk"
+
+
 # MARK: - JSON Mode
 
 def test_json_mode():
@@ -218,6 +324,43 @@ def test_json_mode():
     content = resp.choices[0].message.content
     assert not content.strip().startswith("```"), \
         f"json_object must not return a markdown code fence; got: {content!r}"
+    parsed = json.loads(content)
+    assert isinstance(parsed, dict)
+
+
+def test_streaming_json_mode_valid_json():
+    """stream=True + response_format json_object: the concatenated content
+    deltas MUST form directly-parseable JSON with no markdown fence.
+
+    Regression guard for #223: the streaming path did not fence-strip, so
+    the first delta was ```json\\n{... and the joined stream was invalid JSON
+    even though the non-streaming path (test_json_mode) was correct.
+    """
+    content = ""
+    with httpx.stream(
+        "POST",
+        "http://localhost:11434/v1/chat/completions",
+        json={
+            "model": MODEL,
+            "messages": [{"role": "user", "content": "Return a JSON object with key 'answer' and value 42."}],
+            "response_format": {"type": "json_object"},
+            "stream": True,
+        },
+        timeout=60,
+    ) as resp:
+        for line in resp.iter_lines():
+            if line.startswith("data: "):
+                data = line[6:]
+                if data.strip() == "[DONE]":
+                    break
+                chunk = json.loads(data)
+                if chunk["choices"]:
+                    delta = chunk["choices"][0]["delta"].get("content")
+                    if delta:
+                        content += delta
+
+    assert not content.strip().startswith("```"), \
+        f"streamed json_object must not contain a markdown fence; got: {content!r}"
     parsed = json.loads(content)
     assert isinstance(parsed, dict)
 
@@ -527,3 +670,123 @@ def test_health_endpoint():
     assert "model" in data
     assert "context_window" in data
     assert "model_available" in data
+
+
+# MARK: - Responses API (#365)
+
+def test_responses_non_streaming_basic():
+    """client.responses.create() returns a completed response with output text."""
+    resp = client.responses.create(
+        model=MODEL,
+        input="What is the capital of Austria? Reply with just the city name.",
+    )
+    assert resp.object == "response"
+    assert resp.id.startswith("resp_")
+    assert resp.status == "completed"
+    assert resp.model == MODEL
+    assert resp.store is False
+    assert "vienna" in resp.output_text.lower()
+    assert resp.usage.input_tokens > 0
+    assert resp.usage.output_tokens > 0
+    assert resp.usage.total_tokens == resp.usage.input_tokens + resp.usage.output_tokens
+    msg = resp.output[0]
+    assert msg.type == "message"
+    assert msg.role == "assistant"
+    assert msg.content[0].type == "output_text"
+
+
+def test_responses_instructions_are_honored():
+    """The instructions field acts as a system prompt."""
+    resp = client.responses.create(
+        model=MODEL,
+        input="Say hello.",
+        instructions="Always answer in German.",
+    )
+    assert resp.output_text.strip(), "expected non-empty output"
+
+
+def test_responses_streaming_events():
+    """Streaming emits the canonical event sequence and the deltas
+    concatenate to the final text."""
+    stream = client.responses.create(
+        model=MODEL,
+        input="Count from 1 to 5, digits only, comma-separated.",
+        stream=True,
+    )
+    event_types = []
+    deltas = []
+    final = None
+    for event in stream:
+        event_types.append(event.type)
+        if event.type == "response.output_text.delta":
+            deltas.append(event.delta)
+        if event.type == "response.completed":
+            final = event.response
+    assert event_types[0] == "response.created"
+    assert "response.output_text.delta" in event_types
+    assert event_types[-1] == "response.completed"
+    assert final is not None
+    assert final.status == "completed"
+    assert "".join(deltas) == final.output_text
+    assert final.usage.output_tokens > 0
+
+
+def test_responses_json_schema_structured_output():
+    """text.format json_schema constrains the output to schema-valid JSON."""
+    resp = client.responses.create(
+        model=MODEL,
+        input="Extract the person: Alice is 30 years old.",
+        text={"format": {"type": "json_schema", "name": "person", "schema": {
+            "type": "object",
+            "properties": {"name": {"type": "string"}, "age": {"type": "integer"}},
+            "required": ["name", "age"],
+        }}},
+    )
+    payload = json.loads(resp.output_text)
+    assert isinstance(payload["name"], str)
+    assert isinstance(payload["age"], int)
+
+
+def test_responses_function_tool_call():
+    """A flat Responses function tool produces a function_call output item.
+
+    The Responses API has no seed parameter, so tool elicitation cannot be
+    pinned; retry a few attempts before failing (same philosophy as the
+    rotating-seed helpers, without the seed)."""
+    calls = []
+    resp = None
+    for _ in range(5):
+        resp = client.responses.create(
+            model=MODEL,
+            input="Use the add tool to compute 15 plus 27. You must call the tool.",
+            tools=[{
+                "type": "function",
+                "name": "add",
+                "description": "Add two numbers",
+                "parameters": {
+                    "type": "object",
+                    "properties": {"a": {"type": "number"}, "b": {"type": "number"}},
+                    "required": ["a", "b"],
+                },
+            }],
+        )
+        calls = [item for item in resp.output if item.type == "function_call"]
+        args = json.loads(calls[0].arguments) if calls else None
+        # Prefer an attempt with schema-faithful argument names, but do not
+        # REQUIRE them: the on-device model occasionally hallucinates keys
+        # (observed: value1/value2 for a/b). Key fidelity is model quality;
+        # this test asserts apfel's wire format - the call item, its name,
+        # and verbatim JSON-object arguments.
+        if calls and isinstance(args, dict) and set(args.keys()) <= {"a", "b"}:
+            break
+    assert calls, f"expected a function_call output item, got {[i.type for i in resp.output]}"
+    assert calls[0].name == "add"
+    assert isinstance(args, dict), f"arguments must be a JSON object, got: {calls[0].arguments}"
+
+
+def test_responses_metadata_echoed():
+    """Request metadata is echoed back on the response object."""
+    resp = client.responses.create(
+        model=MODEL, input="Say ok.", metadata={"trace_id": "t-123"},
+    )
+    assert resp.metadata == {"trace_id": "t-123"}

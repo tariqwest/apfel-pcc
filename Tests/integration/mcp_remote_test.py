@@ -20,6 +20,15 @@ import time
 import httpx
 import pytest
 
+from conftest import post_chat_rotating_seeds
+
+# Whole-suite marker: these tests drive real on-device generation (or, for
+# the permit/benchmark suites, need Apple Intelligence up); GitHub CI cannot
+# run them (CLAUDE.md "What GitHub CI CANNOT run"). Keeps -m "not model" a
+# complete, correct model-free selector for the fast preflight phase (#374).
+pytestmark = pytest.mark.model
+
+
 ROOT = pathlib.Path(__file__).resolve().parents[2]
 BINARY = ROOT / ".build" / "release" / "apfel-plus"
 HTTP_MCP_SERVER = ROOT / "mcp" / "http-test-server" / "server.py"
@@ -78,7 +87,16 @@ def _wait_for_port(port, timeout=10):
 
 
 # ============================================================================
+<<<<<<< HEAD
 # Fixtures: HTTP MCP server (no auth) + apfel-plus
+=======
+# Fixtures: HTTP MCP server (no auth) + apfel
+#
+# A server that never becomes healthy is a critical failure, not a skip (#227):
+# skipping turned all 17 remote-MCP tests green when remote MCP was broken, so
+# a startup-breaking regression could pass release qualification. These fixtures
+# pytest.fail instead.
+>>>>>>> upstream/main
 # ============================================================================
 
 
@@ -99,7 +117,7 @@ def http_mcp_port():
         stderr=subprocess.PIPE,
     ):
         if not _wait_for_port(port):
-            pytest.skip("HTTP MCP server did not start in time")
+            pytest.fail("HTTP MCP server did not start in time")
         yield port
 
 
@@ -121,48 +139,38 @@ def apfel_remote_mcp_url(http_mcp_port):
         if not wait_for_http(
             f"http://127.0.0.1:{apfel_port}/health", timeout=20
         ):
+<<<<<<< HEAD
             pytest.skip("apfel-plus with remote MCP did not become healthy")
+=======
+            pytest.fail("apfel with remote MCP did not become healthy")
+>>>>>>> upstream/main
         yield f"http://127.0.0.1:{apfel_port}/v1"
 
 
 @pytest.fixture(scope="module")
 def remote_multiply_response(apfel_remote_mcp_url):
-    resp = httpx.post(
-        f"{apfel_remote_mcp_url}/chat/completions",
-        json={
-            "model": MODEL,
-            "messages": [
-                {
-                    "role": "user",
-                    "content": "Use the multiply tool to compute 247 times 83. Reply with just the number.",
-                }
-            ],
-            "seed": 42,
-        },
-        timeout=TIMEOUT,
-    )
-    assert resp.status_code == 200, f"HTTP {resp.status_code}: {resp.text}"
-    return resp.json()
+    return post_chat_rotating_seeds(f"{apfel_remote_mcp_url}/chat/completions", {
+        "model": MODEL,
+        "messages": [
+            {
+                "role": "user",
+                "content": "Use the multiply tool to compute 247 times 83. Reply with just the number.",
+            }
+        ],
+    }, TIMEOUT)
 
 
 @pytest.fixture(scope="module")
 def remote_add_response(apfel_remote_mcp_url):
-    resp = httpx.post(
-        f"{apfel_remote_mcp_url}/chat/completions",
-        json={
-            "model": MODEL,
-            "messages": [
-                {
-                    "role": "user",
-                    "content": "Use the add tool to add 100 and 200. Reply with just the number.",
-                }
-            ],
-            "seed": 42,
-        },
-        timeout=TIMEOUT,
-    )
-    assert resp.status_code == 200, f"HTTP {resp.status_code}: {resp.text}"
-    return resp.json()
+    return post_chat_rotating_seeds(f"{apfel_remote_mcp_url}/chat/completions", {
+        "model": MODEL,
+        "messages": [
+            {
+                "role": "user",
+                "content": "Use the add tool to add 100 and 200. Reply with just the number.",
+            }
+        ],
+    }, TIMEOUT)
 
 
 # ============================================================================
@@ -187,7 +195,7 @@ def auth_mcp_port():
         stderr=subprocess.PIPE,
     ):
         if not _wait_for_port(port):
-            pytest.skip("Auth MCP server did not start in time")
+            pytest.fail("Auth MCP server did not start in time")
         yield port
 
 
@@ -211,7 +219,11 @@ def apfel_auth_mcp_url(auth_mcp_port):
         if not wait_for_http(
             f"http://127.0.0.1:{apfel_port}/health", timeout=20
         ):
+<<<<<<< HEAD
             pytest.skip("apfel-plus with auth MCP did not become healthy")
+=======
+            pytest.fail("apfel with auth MCP did not become healthy")
+>>>>>>> upstream/main
         yield f"http://127.0.0.1:{apfel_port}/v1"
 
 
@@ -242,7 +254,11 @@ def apfel_mixed_mcp_url(http_mcp_port):
         if not wait_for_http(
             f"http://127.0.0.1:{apfel_port}/health", timeout=25
         ):
+<<<<<<< HEAD
             pytest.skip("apfel-plus with mixed MCP did not become healthy")
+=======
+            pytest.fail("apfel with mixed MCP did not become healthy")
+>>>>>>> upstream/main
         yield f"http://127.0.0.1:{apfel_port}/v1"
 
 
@@ -319,43 +335,49 @@ def test_remote_mcp_response_has_usage(remote_multiply_response):
 
 
 def test_remote_mcp_streaming_tool_auto_execute(apfel_remote_mcp_url):
-    """Streaming SSE chat completions also auto-execute remote MCP tools."""
-    chunks = []
-    finish_reasons = []
-    with httpx.stream(
-        "POST",
-        f"{apfel_remote_mcp_url}/chat/completions",
-        json={
-            "model": MODEL,
-            "messages": [
-                {
-                    "role": "user",
-                    "content": "Use the multiply tool to compute 247 times 83. Reply with just the number.",
-                }
-            ],
-            "stream": True,
-        },
-        timeout=TIMEOUT,
-    ) as resp:
-        assert resp.status_code == 200, f"HTTP {resp.status_code}: {resp.text[:200]}"
-        for line in resp.iter_lines():
-            if line.startswith("data: ") and line != "data: [DONE]":
-                try:
-                    data = json.loads(line[6:])
-                    choices = data.get("choices") or []
-                    if choices:
-                        fr = choices[0].get("finish_reason")
-                        if fr:
-                            finish_reasons.append(fr)
-                        delta = choices[0].get("delta", {}).get("content", "")
-                        if delta:
-                            chunks.append(delta)
-                except (json.JSONDecodeError, KeyError, IndexError):
-                    pass
-    content = "".join(chunks)
+    """Streaming SSE chat completions also auto-execute remote MCP tools.
+
+    Unseeded model trajectory: the model occasionally passes bad arguments to
+    the tool, gets the isError result fed back (#220), and apologizes instead
+    of answering ("It seems there was an error in the multiplication tool.") -
+    observed blocking a release at preflight. Retry a few attempts before
+    failing, per the #324 hardening policy."""
+    content = ""
+    for _ in range(3):
+        chunks = []
+        with httpx.stream(
+            "POST",
+            f"{apfel_remote_mcp_url}/chat/completions",
+            json={
+                "model": MODEL,
+                "messages": [
+                    {
+                        "role": "user",
+                        "content": "Use the multiply tool to compute 247 times 83. Reply with just the number.",
+                    }
+                ],
+                "stream": True,
+            },
+            timeout=TIMEOUT,
+        ) as resp:
+            assert resp.status_code == 200, f"HTTP {resp.status_code}: {resp.text[:200]}"
+            for line in resp.iter_lines():
+                if line.startswith("data: ") and line != "data: [DONE]":
+                    try:
+                        data = json.loads(line[6:])
+                        choices = data.get("choices") or []
+                        if choices:
+                            delta = choices[0].get("delta", {}).get("content", "")
+                            if delta:
+                                chunks.append(delta)
+                    except (json.JSONDecodeError, KeyError, IndexError):
+                        pass
+        content = "".join(chunks)
+        if "20501" in content or "20,501" in content:
+            return
     assert content, "No content in streaming response"
-    assert "20501" in content or "20,501" in content, (
-        f"Expected '20501' (247*83) in streamed response: {content}"
+    assert False, (
+        f"Expected '20501' (247*83) in streamed response after 3 attempts: {content}"
     )
 
 
@@ -374,22 +396,16 @@ def test_auth_mcp_apfel_healthy(apfel_auth_mcp_url):
 
 def test_auth_mcp_tool_executes_correctly(apfel_auth_mcp_url):
     """With correct bearer token, remote MCP tool executes: 6 * 7 = 42."""
-    resp = httpx.post(
-        f"{apfel_auth_mcp_url}/chat/completions",
-        json={
-            "model": MODEL,
-            "messages": [
-                {
-                    "role": "user",
-                    "content": "Use the multiply tool to compute 6 times 7. Just the number.",
-                }
-            ],
-            "seed": 42,
-        },
-        timeout=TIMEOUT,
-    )
-    assert resp.status_code == 200
-    content = resp.json()["choices"][0]["message"]["content"]
+    data = post_chat_rotating_seeds(f"{apfel_auth_mcp_url}/chat/completions", {
+        "model": MODEL,
+        "messages": [
+            {
+                "role": "user",
+                "content": "Use the multiply tool to compute 6 times 7. Just the number.",
+            }
+        ],
+    }, TIMEOUT)
+    content = data["choices"][0]["message"]["content"]
     assert "42" in content, f"Expected '42' in: {content}"
 
 
@@ -506,22 +522,15 @@ def test_mixed_mcp_apfel_healthy(apfel_mixed_mcp_url):
 
 def test_mixed_mcp_tool_executes(apfel_mixed_mcp_url):
     """With mixed local+remote MCP, a tool call executes successfully."""
-    resp = httpx.post(
-        f"{apfel_mixed_mcp_url}/chat/completions",
-        json={
-            "model": MODEL,
-            "messages": [
-                {
-                    "role": "user",
-                    "content": "Use the multiply tool to compute 12 times 12. Just the number.",
-                }
-            ],
-            "seed": 42,
-        },
-        timeout=TIMEOUT,
-    )
-    assert resp.status_code == 200
-    data = resp.json()
+    data = post_chat_rotating_seeds(f"{apfel_mixed_mcp_url}/chat/completions", {
+        "model": MODEL,
+        "messages": [
+            {
+                "role": "user",
+                "content": "Use the multiply tool to compute 12 times 12. Just the number.",
+            }
+        ],
+    }, TIMEOUT)
     assert data["choices"][0]["finish_reason"] == "stop"
     content = data["choices"][0]["message"]["content"]
     assert "144" in content, f"Expected '144' (12*12) in: {content}"

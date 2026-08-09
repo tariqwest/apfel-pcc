@@ -93,6 +93,70 @@ def test_stamp_fails_loudly_without_unreleased_heading():
         assert res.returncode != 0, "must fail when there is no [Unreleased] section"
 
 
+EMPTY_UNRELEASED = """# Changelog
+
+## [Unreleased]
+
+## [1.0.0] - 2026-01-01
+
+### Added
+
+- First release.
+"""
+
+SUBHEADINGS_ONLY = """# Changelog
+
+## [Unreleased]
+
+### Added
+
+### Fixed
+
+## [1.0.0] - 2026-01-01
+
+### Added
+
+- First release.
+"""
+
+
+def test_stamp_fails_when_unreleased_section_is_empty():
+    """#263: stamping an empty [Unreleased] must fail, not ship a blank heading.
+
+    v1.6.1 shipped with an empty section because stamp-changelog.sh happily
+    stamped it; this gate prevents the recurrence.
+    """
+    with tempfile.TemporaryDirectory() as d:
+        f = pathlib.Path(d) / "CHANGELOG.md"
+        f.write_text(EMPTY_UNRELEASED)
+        res = _run("1.1.0", "2026-06-14", str(f))
+        assert res.returncode != 0, "must fail when [Unreleased] has no content lines"
+        # The file must be left untouched (no half-stamp).
+        assert "## [1.1.0]" not in f.read_text()
+
+
+def test_stamp_fails_when_unreleased_has_only_subheadings():
+    """#263: bare ### Added/### Fixed with no bullets counts as empty."""
+    with tempfile.TemporaryDirectory() as d:
+        f = pathlib.Path(d) / "CHANGELOG.md"
+        f.write_text(SUBHEADINGS_ONLY)
+        res = _run("1.1.0", "2026-06-14", str(f))
+        assert res.returncode != 0, "empty subheadings are not content (#263)"
+
+
+def test_preflight_gates_empty_unreleased_when_commits_since_tag():
+    """#263: release-preflight.sh must fail when commits exist since the last
+    tag but [Unreleased] is empty (a feature would ship under a blank heading).
+    """
+    preflight = (ROOT / "scripts" / "release-preflight.sh").read_text()
+    assert "[Unreleased]" in preflight, (
+        "release-preflight.sh must gate an empty [Unreleased] section (#263)"
+    )
+    assert "stamp-changelog.sh" in preflight or "changelog" in preflight.lower(), (
+        "release-preflight.sh must reference the changelog gate (#263)"
+    )
+
+
 def test_publish_release_is_wired_to_stamp_and_commit_changelog():
     text = PUBLISH.read_text()
     assert "stamp-changelog.sh" in text, (

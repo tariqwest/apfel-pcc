@@ -61,9 +61,16 @@ func runStreamCleanupTests() {
     }
 
     testAsync("a StreamCleanup that was never invoked performs no work") {
-        _ = StreamCleanup()  // constructed and dropped
-        // Nothing observable should happen. Assertion is the absence of a crash.
-        try assertTrue(true)
+        // Constructing (and never calling run) must not fire the cleanup work:
+        // the operation is passed to run(), so a StreamCleanup that is only
+        // constructed must leave the counter untouched.
+        let cleanup = StreamCleanup()
+        let counter = CleanupCounter()
+        _ = cleanup  // constructed, run() deliberately never called
+        let count = await counter.value
+        guard count == 0 else {
+            throw TestFailure("a never-invoked StreamCleanup must perform no work, got \(count)")
+        }
     }
 
     // Compile-time: StreamCleanup must remain Sendable so it can cross

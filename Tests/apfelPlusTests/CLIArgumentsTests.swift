@@ -65,6 +65,65 @@ func runCLIArgumentsTests() {
         try assertEqual(args.mode, .benchmark)
     }
 
+    test("--count-tokens sets countTokens mode") {
+        let args = try CLIArguments.parse(["--count-tokens", "hello"])
+        try assertEqual(args.mode, .countTokens)
+        try assertEqual(args.prompt, "hello")
+    }
+
+    test("--count-tokens --strict sets strictCount") {
+        let args = try CLIArguments.parse(["--count-tokens", "--strict", "hello"])
+        try assertEqual(args.mode, .countTokens)
+        try assertTrue(args.strictCount)
+    }
+
+    test("--strict without --count-tokens throws") {
+        do {
+            _ = try CLIArguments.parse(["--strict", "hello"])
+            try assertTrue(false, "should have thrown")
+        } catch let e as CLIParseError {
+            try assertTrue(e.message.contains("--strict"))
+            try assertTrue(e.message.contains("--count-tokens"))
+        }
+    }
+
+    test("--count-tokens --serve throws mode conflict") {
+        do {
+            _ = try CLIArguments.parse(["--count-tokens", "--serve"])
+            try assertTrue(false, "should have thrown")
+        } catch let e as CLIParseError {
+            try assertTrue(e.message.contains("cannot combine"))
+        }
+    }
+
+    test("--count-tokens --chat throws mode conflict") {
+        do {
+            _ = try CLIArguments.parse(["--count-tokens", "--chat"])
+            try assertTrue(false, "should have thrown")
+        } catch let e as CLIParseError {
+            try assertTrue(e.message.contains("cannot combine"))
+        }
+    }
+
+    test("--count-tokens --stream throws mode conflict") {
+        do {
+            _ = try CLIArguments.parse(["--count-tokens", "--stream", "hi"])
+            try assertTrue(false, "should have thrown")
+        } catch let e as CLIParseError {
+            try assertTrue(e.message.contains("cannot combine"))
+        }
+    }
+
+    test("-f retains path in fileAttachments") {
+        let args = try CLIArguments.parse(["-f", "README.md", "summarize"], extractFile: { path in
+            guard path == "README.md" else { throw CLIParseError("unexpected path") }
+            return "# Title"
+        })
+        try assertEqual(args.fileAttachments.count, 1)
+        try assertEqual(args.fileAttachments[0].path, "README.md")
+        try assertEqual(args.fileAttachments[0].content, "# Title")
+    }
+
     test("--model-info sets modelInfo mode") {
         let args = try CLIArguments.parse(["--model-info"])
         try assertEqual(args.mode, .modelInfo)
@@ -111,6 +170,45 @@ func runCLIArgumentsTests() {
         let args = try CLIArguments.parse(["tag"])
         try assertEqual(args.mode, .single)
         try assertEqual(args.prompt, "tag")
+    }
+
+    test("demos --help shows help instead of writing files (#248)") {
+        let args = try CLIArguments.parse(["demos", "--help"])
+        try assertEqual(args.mode, .help)
+    }
+
+    test("demos -h shows help instead of writing files (#248)") {
+        let args = try CLIArguments.parse(["demos", "-h"])
+        try assertEqual(args.mode, .help)
+    }
+
+    test("demos with an unknown dash token throws unknownOption (#248)") {
+        do {
+            _ = try CLIArguments.parse(["demos", "-q"])
+            throw TestFailure("expected CLIParseError for demos -q")
+        } catch let e as CLIParseError {
+            try assertTrue(e.message.contains("unknown option"))
+            try assertTrue(e.message.contains("-q"))
+        }
+    }
+
+    test("demos with --output after it throws unknownOption (#248)") {
+        do {
+            _ = try CLIArguments.parse(["demos", "--output", "json"])
+            throw TestFailure("expected CLIParseError for demos --output json")
+        } catch let e as CLIParseError {
+            try assertTrue(e.message.contains("unknown option"))
+            try assertTrue(e.message.contains("--output"))
+        }
+    }
+
+    test("demos <dir> before a dash token still throws (#248)") {
+        do {
+            _ = try CLIArguments.parse(["demos", "./out", "-q"])
+            throw TestFailure("expected CLIParseError for demos ./out -q")
+        } catch let e as CLIParseError {
+            try assertTrue(e.message.contains("unknown option"))
+        }
     }
 
     // ========================================================================
@@ -177,6 +275,39 @@ func runCLIArgumentsTests() {
     test("bare -- with nothing after leaves prompt empty (stdin path)") {
         let args = try CLIArguments.parse(["--"])
         try assertEqual(args.prompt, "")
+    }
+
+    test("known flag after the prompt is swallowed but warns (#255)") {
+        let args = try CLIArguments.parse(["summarize", "this", "--output", "json"])
+        // Non-breaking: the tail is still the prompt verbatim.
+        try assertEqual(args.prompt, "summarize this --output json")
+        try assertTrue(args.warnings.contains { $0.contains("--output") })
+        try assertTrue(args.warnings.contains { $0.contains("--") })
+    }
+
+    test("short flag after the prompt warns (#255)") {
+        let args = try CLIArguments.parse(["hello", "-q"])
+        try assertEqual(args.prompt, "hello -q")
+        try assertTrue(args.warnings.contains { $0.contains("-q") })
+    }
+
+    test("plain prompt tail with no known flags produces no warning (#255)") {
+        let args = try CLIArguments.parse(["what", "is", "-2", "minus", "3"])
+        try assertEqual(args.prompt, "what is -2 minus 3")
+        try assertTrue(args.warnings.isEmpty)
+    }
+
+    test("non-flag dash tokens in the prompt tail do not warn (#255)") {
+        // Genuinely-textual dash tokens that are not known flags are fine.
+        let args = try CLIArguments.parse(["diff", "--foobar", "please"])
+        try assertEqual(args.prompt, "diff --foobar please")
+        try assertTrue(args.warnings.isEmpty)
+    }
+
+    test("-- before a flag-like prompt suppresses the #255 warning") {
+        let args = try CLIArguments.parse(["--", "summarize", "--output", "json"])
+        try assertEqual(args.prompt, "summarize --output json")
+        try assertTrue(args.warnings.isEmpty)
     }
 
     // ========================================================================
@@ -688,6 +819,54 @@ func runCLIArgumentsTests() {
         }
     }
 
+    test("--retry N as the only remaining token keeps N as the prompt (#253)") {
+        // No token follows the number, so it is the prompt, not the count.
+        let args = try CLIArguments.parse(["--retry", "7"])
+        try assertTrue(args.retryEnabled)
+        try assertEqual(args.retryCount, 3)
+        try assertEqual(args.prompt, "7")
+    }
+
+    test("--retry N with a following token still consumes N as the count (#253)") {
+        // Backward compatibility: `apfel --retry 3 \"prompt here\"`.
+        let args = try CLIArguments.parse(["--retry", "3", "prompt here"])
+        try assertTrue(args.retryEnabled)
+        try assertEqual(args.retryCount, 3)
+        try assertEqual(args.prompt, "prompt here")
+    }
+
+    test("--retry=N sets the count unambiguously (#253)") {
+        let args = try CLIArguments.parse(["--retry=5", "hi"])
+        try assertTrue(args.retryEnabled)
+        try assertEqual(args.retryCount, 5)
+        try assertEqual(args.prompt, "hi")
+    }
+
+    test("--retry=N with no prompt keeps the count and leaves the prompt empty (#253)") {
+        let args = try CLIArguments.parse(["--retry=8"])
+        try assertTrue(args.retryEnabled)
+        try assertEqual(args.retryCount, 8)
+        try assertEqual(args.prompt, "")
+    }
+
+    test("--retry=0 throws (non-positive count rejected) (#253)") {
+        do {
+            _ = try CLIArguments.parse(["--retry=0"])
+            throw TestFailure("expected CLIParseError for --retry=0")
+        } catch let e as CLIParseError {
+            try assertTrue(e.message.contains("--retry"))
+        }
+    }
+
+    test("--retry=abc throws (non-numeric count rejected) (#253)") {
+        do {
+            _ = try CLIArguments.parse(["--retry=abc"])
+            throw TestFailure("expected CLIParseError for --retry=abc")
+        } catch let e as CLIParseError {
+            try assertTrue(e.message.contains("--retry"))
+        }
+    }
+
     // ========================================================================
     // MARK: - Context flags
     // ========================================================================
@@ -814,6 +993,84 @@ func runCLIArgumentsTests() {
         try assertTrue(args.debug)
     }
 
+    // ========================================================================
+    // MARK: - Invalid env value warnings (#254)
+    // ========================================================================
+
+    test("valid env values produce no warnings (#254)") {
+        let args = try CLIArguments.parse(
+            ["hi"],
+            env: ["APFEL_PORT": "8080", "APFEL_TEMPERATURE": "0.5",
+                  "APFEL_MAX_TOKENS": "200", "APFEL_CONTEXT_STRATEGY": "strict"]
+        )
+        try assertTrue(args.warnings.isEmpty)
+    }
+
+    test("APFEL_PORT out of range warns and falls back to default (#254)") {
+        let args = try CLIArguments.parse(["--serve"], env: ["APFEL_PORT": "99999"])
+        try assertEqual(args.serverPort, 11434)
+        try assertEqual(args.warnings.count, 1)
+        try assertTrue(args.warnings[0].contains("APFEL_PORT"))
+        try assertTrue(args.warnings[0].contains("99999"))
+    }
+
+    test("APFEL_TEMPERATURE non-numeric warns (#254)") {
+        let args = try CLIArguments.parse(["hi"], env: ["APFEL_TEMPERATURE": "abc"])
+        try assertNil(args.temperature)
+        try assertTrue(args.warnings.contains { $0.contains("APFEL_TEMPERATURE") && $0.contains("abc") })
+    }
+
+    test("APFEL_TEMPERATURE negative warns (#254)") {
+        let args = try CLIArguments.parse(["hi"], env: ["APFEL_TEMPERATURE": "-1"])
+        try assertNil(args.temperature)
+        try assertTrue(args.warnings.contains { $0.contains("APFEL_TEMPERATURE") })
+    }
+
+    test("APFEL_MAX_TOKENS non-positive warns (#254)") {
+        let args = try CLIArguments.parse(["hi"], env: ["APFEL_MAX_TOKENS": "0"])
+        try assertNil(args.maxTokens)
+        try assertTrue(args.warnings.contains { $0.contains("APFEL_MAX_TOKENS") && $0.contains("0") })
+    }
+
+    test("APFEL_MCP_TIMEOUT invalid warns (#254)") {
+        let args = try CLIArguments.parse(["hi"], env: ["APFEL_MCP_TIMEOUT": "-5"])
+        try assertEqual(args.mcpTimeoutSeconds, 5)
+        try assertTrue(args.warnings.contains { $0.contains("APFEL_MCP_TIMEOUT") })
+    }
+
+    test("APFEL_CONTEXT_STRATEGY unknown warns (#254)") {
+        let args = try CLIArguments.parse(["--chat"], env: ["APFEL_CONTEXT_STRATEGY": "newest_first"])
+        try assertNil(args.contextStrategy)
+        try assertTrue(args.warnings.contains { $0.contains("APFEL_CONTEXT_STRATEGY") && $0.contains("newest_first") })
+    }
+
+    test("APFEL_CONTEXT_MAX_TURNS invalid warns (#254)") {
+        let args = try CLIArguments.parse(["--chat"], env: ["APFEL_CONTEXT_MAX_TURNS": "abc"])
+        try assertNil(args.contextMaxTurns)
+        try assertTrue(args.warnings.contains { $0.contains("APFEL_CONTEXT_MAX_TURNS") })
+    }
+
+    test("APFEL_CONTEXT_OUTPUT_RESERVE invalid warns (#254)") {
+        let args = try CLIArguments.parse(["--chat"], env: ["APFEL_CONTEXT_OUTPUT_RESERVE": "0"])
+        try assertNil(args.contextOutputReserve)
+        try assertTrue(args.warnings.contains { $0.contains("APFEL_CONTEXT_OUTPUT_RESERVE") })
+    }
+
+    test("multiple invalid env values each produce a warning (#254)") {
+        let args = try CLIArguments.parse(
+            ["hi"],
+            env: ["APFEL_PORT": "99999", "APFEL_TEMPERATURE": "abc",
+                  "APFEL_CONTEXT_STRATEGY": "bogus"]
+        )
+        try assertEqual(args.warnings.count, 3)
+    }
+
+    test("empty env value is ignored without warning (#254)") {
+        // An unset/empty var is not a misconfiguration, just absence.
+        let args = try CLIArguments.parse(["hi"], env: ["APFEL_PORT": "", "APFEL_TEMPERATURE": ""])
+        try assertTrue(args.warnings.isEmpty)
+    }
+
     test("APFEL_MCP env splits on colon separator") {
         let args = try CLIArguments.parse(["hi"], env: ["APFEL_MCP": "a.py:b.py"])
         try assertEqual(args.mcpServerPaths, ["a.py", "b.py"])
@@ -828,10 +1085,10 @@ func runCLIArgumentsTests() {
     // MARK: - File reader injection
     // ========================================================================
 
-    test("--file uses injected readFile closure") {
+    test("--file uses injected extractFile closure") {
         let args = try CLIArguments.parse(
             ["--file", "test.txt", "summarize"],
-            readFile: { path in
+            extractFile: { path in
                 try assertEqual(path, "test.txt")
                 return "file content here"
             }
@@ -865,7 +1122,7 @@ func runCLIArgumentsTests() {
         var callCount = 0
         let args = try CLIArguments.parse(
             ["-f", "a.txt", "-f", "b.txt", "compare"],
-            readFile: { path in
+            extractFile: { path in
                 callCount += 1
                 return "content of \(path)"
             }

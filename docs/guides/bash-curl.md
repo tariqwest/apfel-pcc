@@ -205,7 +205,11 @@ Lab script: [`06_example.sh`](https://github.com/Arthur-Ficial/apfel-guides-lab/
 
 ## Tested with
 
+<<<<<<< HEAD
 - apfel-plus v1.0.3 / macOS 26.3.1 Apple Silicon
+=======
+- apfel v1.0.3 / macOS 26.3.1 Apple Silicon (original capture; the CLI and HTTP surfaces used here are release-gated by apfel's test suite on every version)
+>>>>>>> upstream/main
 - Bash 5.3 / jq 1.7 / curl (system)
 - Date: 2026-04-16
 

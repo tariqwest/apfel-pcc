@@ -44,9 +44,14 @@ func runOpenAIModelsTests() {
         try assertEqual(choice, .specific(name: "lookup"))
     }
 
-    test("ToolChoice falls back to auto for unknown string") {
+    test("ToolChoice decodes auto string") {
         let choice = try decode(ToolChoice.self, from: #""auto""#)
         try assertEqual(choice, .auto)
+    }
+
+    test("ToolChoice decodes unrecognized string to .invalid (#238)") {
+        let choice = try decode(ToolChoice.self, from: #""banana""#)
+        try assertEqual(choice, .invalid("banana"))
     }
 
     test("ChatCompletionRequest decodes stream_options.include_usage=true") {
@@ -135,6 +140,22 @@ func runChatRequestValidatorTests() {
             from: #"{"model":"gpt-4o","messages":[{"role":"user","content":"hi"}]}"#
         )
         try assertEqual(ChatRequestValidator.validate(request), .invalidModel("gpt-4o"))
+    }
+
+    test("invalidModel failure maps to 404 model_not_found param model (#236)") {
+        let failure = ChatRequestValidationFailure.invalidModel("gpt-4o")
+        try assertEqual(failure.httpStatusCode, 404)
+        try assertEqual(failure.errorCode, "model_not_found")
+        try assertEqual(failure.errorParam, "model")
+    }
+
+    test("non-model failures map to 400 with nil code and param (#236)") {
+        try assertEqual(ChatRequestValidationFailure.emptyMessages.httpStatusCode, 400)
+        try assertNil(ChatRequestValidationFailure.emptyMessages.errorCode)
+        try assertNil(ChatRequestValidationFailure.emptyMessages.errorParam)
+        try assertEqual(ChatRequestValidationFailure.invalidLastRole.httpStatusCode, 400)
+        try assertNil(ChatRequestValidationFailure.invalidParameterValue("x").errorCode)
+        try assertNil(ChatRequestValidationFailure.invalidParameterValue("x").errorParam)
     }
 
     test("validator accepts valid model name") {
@@ -237,6 +258,31 @@ func runChatRequestValidatorTests() {
         )
     }
 
+    test("validator rejects empty string content in last user message (#233)") {
+        let request = try decode(
+            ChatCompletionRequest.self,
+            from: #"{"model":"\#(M)","messages":[{"role":"user","content":""}]}"#
+        )
+        try assertEqual(ChatRequestValidator.validate(request), .emptyLastMessageContent)
+    }
+
+    test("validator rejects null content in last user message (#233)") {
+        let request = try decode(
+            ChatCompletionRequest.self,
+            from: #"{"model":"\#(M)","messages":[{"role":"user","content":null}]}"#
+        )
+        try assertEqual(ChatRequestValidator.validate(request), .emptyLastMessageContent)
+    }
+
+    test("validator allows tool last message with empty content (#233)") {
+        // Tool-role final messages use a synthetic prompt, so empty content is fine.
+        let request = try decode(
+            ChatCompletionRequest.self,
+            from: #"{"model":"\#(M)","messages":[{"role":"tool","tool_call_id":"c1","name":"x","content":""}]}"#
+        )
+        try assertNil(ChatRequestValidator.validate(request))
+    }
+
     test("validator rejects max_tokens <= 0") {
         let request = try decode(
             ChatCompletionRequest.self,
@@ -257,12 +303,112 @@ func runChatRequestValidatorTests() {
         }
     }
 
+    test("validator rejects temperature > 2 (#235)") {
+        let request = try decode(
+            ChatCompletionRequest.self,
+            from: #"{"model":"\#(M)","messages":[{"role":"user","content":"hi"}],"temperature":5.0}"#
+        )
+        if case .invalidParameterValue = ChatRequestValidator.validate(request) { } else {
+            throw TestFailure("expected .invalidParameterValue for temperature=5.0")
+        }
+    }
+
+    test("validator rejects top_p > 1 (#235)") {
+        let request = try decode(
+            ChatCompletionRequest.self,
+            from: #"{"model":"\#(M)","messages":[{"role":"user","content":"hi"}],"top_p":2.0}"#
+        )
+        if case .invalidParameterValue = ChatRequestValidator.validate(request) { } else {
+            throw TestFailure("expected .invalidParameterValue for top_p=2.0")
+        }
+    }
+
+    test("validator rejects top_p < 0 (#235)") {
+        let request = try decode(
+            ChatCompletionRequest.self,
+            from: #"{"model":"\#(M)","messages":[{"role":"user","content":"hi"}],"top_p":-0.5}"#
+        )
+        if case .invalidParameterValue = ChatRequestValidator.validate(request) { } else {
+            throw TestFailure("expected .invalidParameterValue for top_p=-0.5")
+        }
+    }
+
+    test("validator accepts top_p at boundaries 0 and 1 (#235)") {
+        let lo = try decode(
+            ChatCompletionRequest.self,
+            from: #"{"model":"\#(M)","messages":[{"role":"user","content":"hi"}],"top_p":0.0}"#
+        )
+        try assertNil(ChatRequestValidator.validate(lo))
+        let hi = try decode(
+            ChatCompletionRequest.self,
+            from: #"{"model":"\#(M)","messages":[{"role":"user","content":"hi"}],"top_p":1.0}"#
+        )
+        try assertNil(ChatRequestValidator.validate(hi))
+    }
+
+    test("validator accepts temperature at upper bound 2 (#235)") {
+        let request = try decode(
+            ChatCompletionRequest.self,
+            from: #"{"model":"\#(M)","messages":[{"role":"user","content":"hi"}],"temperature":2.0}"#
+        )
+        try assertNil(ChatRequestValidator.validate(request))
+    }
+
     test("validator accepts valid max_tokens and temperature") {
         let request = try decode(
             ChatCompletionRequest.self,
             from: #"{"model":"\#(M)","messages":[{"role":"user","content":"hi"}],"max_tokens":100,"temperature":0.7}"#
         )
         try assertNil(ChatRequestValidator.validate(request))
+    }
+
+    test("validator rejects negative seed") {
+        let request = try decode(
+            ChatCompletionRequest.self,
+            from: #"{"model":"\#(M)","messages":[{"role":"user","content":"hi"}],"seed":-1}"#
+        )
+        try assertEqual(
+            ChatRequestValidator.validate(request),
+            .invalidParameterValue("'seed' must be a non-negative integer, got -1")
+        )
+    }
+
+    test("validator accepts non-negative seed") {
+        let request = try decode(
+            ChatCompletionRequest.self,
+            from: #"{"model":"\#(M)","messages":[{"role":"user","content":"hi"}],"seed":42}"#
+        )
+        try assertNil(ChatRequestValidator.validate(request))
+    }
+
+    test("validator accepts seed of zero") {
+        let request = try decode(
+            ChatCompletionRequest.self,
+            from: #"{"model":"\#(M)","messages":[{"role":"user","content":"hi"}],"seed":0}"#
+        )
+        try assertNil(ChatRequestValidator.validate(request))
+    }
+
+    test("validator rejects unknown x_context_strategy listing valid values (#237)") {
+        let request = try decode(
+            ChatCompletionRequest.self,
+            from: #"{"model":"\#(M)","messages":[{"role":"user","content":"hi"}],"x_context_strategy":"sliding-window-typo"}"#
+        )
+        guard case .invalidParameterValue(let detail) = ChatRequestValidator.validate(request) else {
+            throw TestFailure("expected .invalidParameterValue for unknown x_context_strategy")
+        }
+        try assertTrue(detail.contains("newest-first"))
+        try assertTrue(detail.contains("sliding-window-typo"))
+    }
+
+    test("validator accepts every valid x_context_strategy (#237)") {
+        for strategy in ContextStrategy.allCases {
+            let request = try decode(
+                ChatCompletionRequest.self,
+                from: #"{"model":"\#(M)","messages":[{"role":"user","content":"hi"}],"x_context_strategy":"\#(strategy.rawValue)"}"#
+            )
+            try assertNil(ChatRequestValidator.validate(request))
+        }
     }
 
     test("validator rejects x_context_max_turns <= 0") {
@@ -317,6 +463,37 @@ func runChatRequestValidatorTests() {
         try assertEqual(UnsupportedChatParameter.detect(in: request), .presencePenalty)
     }
 
+    test("validator rejects invalid tool_choice string (#238)") {
+        let request = try decode(
+            ChatCompletionRequest.self,
+            from: #"{"model":"\#(M)","messages":[{"role":"user","content":"hi"}],"tool_choice":"banana"}"#
+        )
+        guard case .invalidParameterValue(let detail) = ChatRequestValidator.validate(request) else {
+            throw TestFailure("expected .invalidParameterValue for tool_choice=banana")
+        }
+        try assertTrue(detail.contains("tool_choice"))
+    }
+
+    test("validator rejects undecodable tool_choice object (#238)") {
+        let request = try decode(
+            ChatCompletionRequest.self,
+            from: #"{"model":"\#(M)","messages":[{"role":"user","content":"hi"}],"tool_choice":{"foo":"bar"}}"#
+        )
+        if case .invalidParameterValue = ChatRequestValidator.validate(request) { } else {
+            throw TestFailure("expected .invalidParameterValue for undecodable tool_choice object")
+        }
+    }
+
+    test("validator accepts recognized tool_choice values (#238)") {
+        for raw in [#""auto""#, #""none""#, #""required""#, #"{"type":"function","function":{"name":"f"}}"#] {
+            let request = try decode(
+                ChatCompletionRequest.self,
+                from: #"{"model":"\#(M)","messages":[{"role":"user","content":"hi"}],"tool_choice":\#(raw)}"#
+            )
+            try assertNil(ChatRequestValidator.validate(request))
+        }
+    }
+
     test("validator prioritizes empty messages before invalid model") {
         let request = try decode(
             ChatCompletionRequest.self,
@@ -365,6 +542,28 @@ func runChatRequestValidatorTests() {
         try assertEqual(
             ChatRequestValidator.validate(request),
             .invalidParameterValue("'max_tokens' must be a positive integer, got 0")
+        )
+    }
+
+    test("validator reports temperature before negative seed") {
+        let request = try decode(
+            ChatCompletionRequest.self,
+            from: #"{"model":"\#(M)","messages":[{"role":"user","content":"hi"}],"temperature":-1,"seed":-1}"#
+        )
+        try assertEqual(
+            ChatRequestValidator.validate(request),
+            .invalidParameterValue("'temperature' must be non-negative, got -1.0")
+        )
+    }
+
+    test("validator reports negative seed before invalid context knobs") {
+        let request = try decode(
+            ChatCompletionRequest.self,
+            from: #"{"model":"\#(M)","messages":[{"role":"user","content":"hi"}],"seed":-1,"x_context_max_turns":0,"x_context_output_reserve":0}"#
+        )
+        try assertEqual(
+            ChatRequestValidator.validate(request),
+            .invalidParameterValue("'seed' must be a non-negative integer, got -1")
         )
     }
 

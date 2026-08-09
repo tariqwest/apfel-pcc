@@ -117,11 +117,33 @@ def get_nums(args):
     return nums
 
 
+def to_num(v):
+    """Coerce one argument value to a number, or None if it is not numeric.
+    The model routinely sends numbers as strings ({"a":"999"}); without
+    coercion Python string-concatenates and add() silently lies (#322)."""
+    if isinstance(v, bool):
+        return None
+    if isinstance(v, (int, float)):
+        return v
+    if isinstance(v, str):
+        try:
+            return float(v) if "." in v else int(v)
+        except ValueError:
+            return None
+    return None
+
+
 def execute(name, args):
     """Execute a tool by name. Tolerates improvised argument keys."""
     nums = get_nums(args)
-    a = args.get("a", nums[0] if nums else 0)
-    b = args.get("b", nums[1] if len(nums) > 1 else 0)
+    a_raw = args.get("a", nums[0] if nums else 0)
+    b_raw = args.get("b", nums[1] if len(nums) > 1 else 0)
+    a = to_num(a_raw)
+    b = to_num(b_raw)
+    if a is None:
+        return f"Error: non-numeric argument {a_raw!r}"
+    if b is None:
+        return f"Error: non-numeric argument {b_raw!r}"
 
     try:
         if name == "add":

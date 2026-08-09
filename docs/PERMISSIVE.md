@@ -3,7 +3,11 @@
 Real output from Apple's on-device model showing the effect of `--permissive`
 on guardrail behavior. Every response is unedited.
 
+<<<<<<< HEAD
 > apfel-plus v0.9.0 | macOS 26.3.1 | arm64 | 2026-04-07
+=======
+> apfel v0.9.0 | macOS 26.3.1 | arm64 | 2026-04-07 (original capture - the outputs below are historical. Guardrail behavior shifts between model releases; the macOS 26.5.2 model refuses more aggressively than the one captured here.)
+>>>>>>> upstream/main
 
 ## What `--permissive` does
 
@@ -269,5 +273,5 @@ Medieval siege engines were a crucial part of warfare during the Middle Ages, de
 | `--permissive` | 0/10 | 10/10 | 0% |
 
 `--permissive` reduces false positives while still running inference on-device
-with Apple's model. It does not disable safety entirely -- it uses Apple's
+with Apple's model. It does not disable safety entirely - it uses Apple's
 `.permissiveContentTransformations` guardrail level.

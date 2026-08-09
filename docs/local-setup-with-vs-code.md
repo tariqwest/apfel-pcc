@@ -32,7 +32,11 @@ brew services start apfel-plus
 
 Background-service details: [background-service.md](background-service.md)
 
+<<<<<<< HEAD
 Important: use **Chat Completions**, not the newer Responses API. `apfel-plus` supports `POST /v1/chat/completions` and does not implement `POST /v1/responses`.
+=======
+Important: this setup uses **Chat Completions** (`POST /v1/chat/completions`), which is what Continue's `openai` provider speaks. apfel also implements the newer Responses API (`POST /v1/responses`), but Continue does not use it here.
+>>>>>>> upstream/main
 
 ## 2. Install the Continue extension in Visual Studio Code
 
@@ -96,7 +100,11 @@ Why this split works:
 - `apfel-plus-review` is restricted to `chat`, so it becomes the local review lane.
 - `gpt-5.1-apply` handles `edit` and `apply`, where a stronger hosted model is more useful.
 - `temperature: 0.0` keeps both lanes deterministic.
+<<<<<<< HEAD
 - `contextLength: 4096` matches `apfel-plus`'s local context budget.
+=======
+- `contextLength: 4096` matches `apfel`'s local context budget on macOS 26; on macOS 27 the on-device window is 8192 (`apfel --model-info` prints the live value).
+>>>>>>> upstream/main
 
 ## 4. Provide `OPENAI_API_KEY` to Continue
 
@@ -117,7 +125,7 @@ Inside the `# --- OpenAI Codex: Start` / `# --- OpenAI Codex: End` block in `~/.
 - `cli` logs Codex in and writes `OPENAI_API_KEY=...` to `~/.continue/.env`
 - `clo` logs Codex out and removes only the `OPENAI_API_KEY` line from `~/.continue/.env`
 
-That means your typical flow becomes:
+This keeps the Continue secret in step with your Codex/OpenAI shell workflow without manual edits. Your typical flow becomes:
 
 ```bash
 source ~/.zshrc
@@ -129,8 +137,6 @@ When you are done with the Visual Studio Code session:
 ```bash
 clo
 ```
-
-This keeps the Continue secret in step with the rest of your Codex/OpenAI shell workflow without requiring manual edits to `~/.continue/.env` each time.
 
 ## 6. Restart Visual Studio Code after auth changes
 
@@ -178,7 +184,7 @@ If Continue cannot talk to local `apfel-plus`:
 - make sure `apfel-plus --serve` is running
 - confirm the base URL is `http://127.0.0.1:11434/v1`
 - confirm the model name is `apple-foundationmodel`
-- make sure the client is using Chat Completions, not Responses
+- make sure the client is pointed at Chat Completions (`/v1/chat/completions`)
 
 If Continue cannot use the hosted edit/apply model:
 

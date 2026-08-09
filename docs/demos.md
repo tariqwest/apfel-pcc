@@ -1,18 +1,32 @@
 # Demos
 
+<<<<<<< HEAD
 `apfel-plus` ships with real shell wrappers in `demo/`. This page keeps the longer walkthroughs that used to live in `README.md`; the quicker per-script overview stays in [../demo/README.md](../demo/README.md).
 
 ## Getting the demos
 
 The demos are embedded in the `apfel-plus` binary, so you can write them out no matter how you installed apfel-plus (homebrew-core, the tariqwest tap, or a source build):
+=======
+`apfel` ships with real shell wrappers in `demo/`. This page keeps the longer walkthroughs; the per-script overview stays in [../demo/README.md](../demo/README.md).
+
+## Getting the demos
+
+The demos are embedded in the `apfel` binary - write them out no matter how you installed apfel (homebrew-core, the tap, or source):
+>>>>>>> upstream/main
 
 ```bash
 apfel-plus demos ./apfel-demos
 ```
 
+<<<<<<< HEAD
 This writes every demo script (executable) plus a `README.md` into `./apfel-demos`. Pass a different directory to put them elsewhere, and re-run after `brew upgrade apfel-plus` to refresh them. There is deliberately no `brew install --with-demo` option: homebrew-core does not support formula options, so a brew flag could never behave the same on core and on the tap - a built-in `apfel-plus demos` command does.
 
 The tariqwest tap additionally installs each demo as an `apfel-plus-<name>` companion command (e.g. `apfel-plus-cmd`); `apfel-plus demos` is the channel-independent way to get the raw, editable scripts.
+=======
+This writes every demo (executable) plus a `README.md` into `./apfel-demos` (pass another directory to relocate). Re-run after `brew upgrade apfel` to refresh. There is deliberately no `brew install --with-demo` flag: homebrew-core does not support formula options, so it could never behave the same on core and tap - a built-in `apfel demos` command does.
+
+The Arthur-Ficial tap additionally installs each demo as an `apfel-<name>` command (e.g. `apfel-cmd`); `apfel demos` is the channel-independent way to get the raw, editable scripts.
+>>>>>>> upstream/main
 
 ## [../demo/cmd](../demo/cmd)
 

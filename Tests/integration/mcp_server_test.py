@@ -24,6 +24,15 @@ import subprocess
 import tempfile
 import time
 
+from conftest import GUARDRAIL_SEEDS, is_guardrail_refusal, post_chat_rotating_seeds
+
+# Whole-suite marker: these tests drive real on-device generation (or, for
+# the permit/benchmark suites, need Apple Intelligence up); GitHub CI cannot
+# run them (CLAUDE.md "What GitHub CI CANNOT run"). Keeps -m "not model" a
+# complete, correct model-free selector for the fast preflight phase (#374).
+pytestmark = pytest.mark.model
+
+
 BASE_URL = "http://localhost:11435"
 API_URL = f"{BASE_URL}/v1"
 MODEL = "apple-foundationmodel"
@@ -119,6 +128,108 @@ def running_custom_mcp_server(mcp_script):
                 proc.wait(timeout=5)
 
 
+@contextlib.contextmanager
+def running_mcp_servers(mcp_scripts):
+    """Start apfel --serve with several --mcp servers; yield (api_url, read_log).
+
+    read_log() returns the captured stdout+stderr so a test can assert on
+    startup diagnostics (e.g. the tool-name collision warning, #239).
+    """
+    port = find_free_port()
+    with tempfile.NamedTemporaryFile(mode="w+", encoding="utf-8") as log_file:
+        args = [str(BINARY), "--serve", "--port", str(port)]
+        for script in mcp_scripts:
+            args += ["--mcp", str(script)]
+        proc = subprocess.Popen(args, stdout=log_file, stderr=log_file, text=True)
+        base_url = f"http://127.0.0.1:{port}"
+
+        def read_log():
+            log_file.flush()
+            with open(log_file.name, "r", encoding="utf-8") as fh:
+                return fh.read()
+
+        try:
+            wait_for_server(base_url)
+            yield f"{base_url}/v1", read_log
+        finally:
+            proc.terminate()
+            try:
+                proc.wait(timeout=5)
+            except subprocess.TimeoutExpired:
+                proc.kill()
+                proc.wait(timeout=5)
+
+
+@contextlib.contextmanager
+def running_mcp_server_with_env(mcp_script, extra_env):
+    """Start apfel --serve --mcp <script> with extra env vars; yield read_log.
+
+    Used to prove the local MCP subprocess env is scrubbed (#229): the parent
+    apfel process is given secrets, and the fixture reflects what it could see
+    through its tool names, which apfel prints on the startup banner.
+    """
+    import os as _os
+
+    port = find_free_port()
+    env = _os.environ.copy()
+    env.update(extra_env)
+    with tempfile.NamedTemporaryFile(mode="w+", encoding="utf-8") as log_file:
+        proc = subprocess.Popen(
+            [str(BINARY), "--serve", "--port", str(port), "--mcp", str(mcp_script)],
+            stdout=log_file,
+            stderr=log_file,
+            text=True,
+            env=env,
+        )
+        base_url = f"http://127.0.0.1:{port}"
+
+        def read_log():
+            log_file.flush()
+            with open(log_file.name, "r", encoding="utf-8") as fh:
+                return fh.read()
+
+        try:
+            wait_for_server(base_url)
+            yield read_log
+        finally:
+            proc.terminate()
+            try:
+                proc.wait(timeout=5)
+            except subprocess.TimeoutExpired:
+                proc.kill()
+                proc.wait(timeout=5)
+
+
+def test_local_mcp_subprocess_env_is_scrubbed():
+    """Local MCP scripts must not inherit apfel/secret env vars (#229).
+
+    Model-free: only exercises initialize + tools/list. The fixture names a
+    ``leaked_*`` tool for every canary secret it can still see and a ``saw_*``
+    tool for every allowlisted passthrough var; apfel prints the tool names on
+    startup, so the banner reveals exactly what crossed the boundary.
+    """
+    secrets = {
+        "APFEL_TOKEN": "server-secret-xyz",
+        "APFEL_MCP_TOKEN": "mcp-secret-xyz",
+        "TEST_CANARY_SECRET": "leak-secret",
+        "TEST_CANARY_API_KEY": "leak-key",
+        "TEST_CANARY_TOKEN": "leak-token",
+        "PYTHONPATH": "/tmp/pythonpath-canary",
+    }
+    with running_mcp_server_with_env(
+        FIXTURES / "env_echo_mcp_server.py", secrets
+    ) as read_log:
+        banner = read_log()
+    # The fixture ran (handshake + tools/list succeeded).
+    assert "env_report" in banner
+    # No secret crossed into the child.
+    assert "leaked_" not in banner, banner
+    # Allowlisted PYTHON var still passed through so venv/FastMCP servers work.
+    assert "saw_pythonpath" in banner
+    # Baseline vars the child needs are present.
+    assert "saw_path" in banner
+
+
 # ============================================================================
 # Module-scoped fixtures -- each makes ONE LLM call, shared across tests
 # ============================================================================
@@ -133,29 +244,36 @@ def health_response():
 @pytest.fixture(scope="module")
 def multiply_247x83_response():
     """Non-streaming multiply 247*83 -- shared by auto-execute and result tests."""
-    resp = httpx.post(f"{API_URL}/chat/completions", json={
+    return post_chat_rotating_seeds(f"{API_URL}/chat/completions", {
         "model": MODEL,
         "messages": [
             {"role": "user", "content": "Use the multiply tool to compute 247 times 83. Reply with just the number."}
         ],
-        "seed": 42,
-    }, timeout=TIMEOUT)
-    return resp.json()
+    }, TIMEOUT)
 
 
 @pytest.fixture(scope="module")
 def multiply_streaming_response():
-    """Streaming multiply 13*7 -- tests streaming MCP auto-execute."""
-    resp = httpx.post(f"{API_URL}/chat/completions", json={
-        "model": MODEL,
-        "messages": [
-            {"role": "user", "content": "Use the multiply tool to compute 13 times 7. Reply with just the number."}
-        ],
-        "stream": True,
-        "seed": 42,
-    }, timeout=TIMEOUT)
-    assert resp.status_code == 200
-    return collect_sse(resp)
+    """Streaming multiply 13*7 -- tests streaming MCP auto-execute.
+
+    Streaming variant of the seed rotation (#324): retry past in-band
+    guardrail refusals so consuming tests assert on a real answer."""
+    content = ""
+    for seed in GUARDRAIL_SEEDS:
+        resp = httpx.post(f"{API_URL}/chat/completions", json={
+            "model": MODEL,
+            "messages": [
+                {"role": "user", "content": "Use the multiply tool to compute 13 times 7. Reply with just the number."}
+            ],
+            "stream": True,
+            "seed": seed,
+        }, timeout=TIMEOUT)
+        assert resp.status_code == 200
+        parsed = collect_sse(resp)
+        content = parsed[0]
+        if not is_guardrail_refusal(content):
+            return parsed
+    pytest.fail(f"streaming multiply refused on all seeds; last content: {content!r}")
 
 
 @pytest.fixture(scope="module")
@@ -183,16 +301,18 @@ def normal_streaming_response():
 
 @pytest.fixture(scope="module")
 def add_tool_response():
-    """Non-streaming add 100+200 -- shared by stop-not-tool_calls and usage tests."""
-    resp = httpx.post(f"{API_URL}/chat/completions", json={
+    """Non-streaming add 100+200 -- shared by stop-not-tool_calls and usage tests.
+
+    Seed-rotated (#323): on macOS 26.5.2, seed 42 returned an in-band guardrail
+    refusal for this exact prompt ("The add function resulted in 300, which is
+    a violation of my programming rules") and the consuming tests passed only
+    because the refusal happened to contain "300"."""
+    return post_chat_rotating_seeds(f"{API_URL}/chat/completions", {
         "model": MODEL,
         "messages": [
             {"role": "user", "content": "Use the add function to add 100 and 200. Reply with just the number."}
         ],
-        "seed": 42,
-    }, timeout=TIMEOUT)
-    assert resp.status_code == 200
-    return resp.json()
+    }, TIMEOUT)
 
 
 # ============================================================================
@@ -306,7 +426,7 @@ def test_client_tools_not_auto_executed():
     Auto-execution only applies to MCP-injected tools. Client tools are the
     client's responsibility to execute.
     """
-    resp = httpx.post(f"{API_URL}/chat/completions", json={
+    data = post_chat_rotating_seeds(f"{API_URL}/chat/completions", {
         "model": MODEL,
         "messages": [
             {"role": "user", "content": "Use the get_weather function for Vienna."}
@@ -324,29 +444,34 @@ def test_client_tools_not_auto_executed():
             }
         }],
         "tool_choice": {"type": "function", "function": {"name": "get_weather"}},
-        "seed": 42,
-    }, timeout=TIMEOUT)
-    assert resp.status_code == 200
-    data = resp.json()
+    }, TIMEOUT, accept=lambda d: d["choices"][0]["finish_reason"] == "tool_calls")
     assert data["choices"][0]["finish_reason"] == "tool_calls", \
         f"Expected 'tool_calls' for client tools but got '{data['choices'][0]['finish_reason']}'"
 
 
-def test_mcp_tool_error_returns_structured_error():
-    """MCP tool failures must be surfaced honestly, not rewritten by the model."""
-    resp = httpx.post(f"{API_URL}/chat/completions", json={
+def test_mcp_tool_iserror_is_fed_back_to_model_not_500():
+    """An MCP `isError: true` tool result (e.g. divide by zero) is fed back to
+    the model to recover, not aborted with HTTP 500 (#220).
+
+    Per the MCP spec, execution errors "should be reported inside the result
+    object ... so the LLM can see it and act". Previously apfel turned isError
+    into a thrown MCPError.serverError -> HTTP 500. Now the request completes
+    normally (200) with a natural-language answer; only transport/protocol
+    failures (timeout, dead pipe) still surface as 500 (covered by the timeout
+    and crashed-server tests below).
+    """
+    data = post_chat_rotating_seeds(f"{API_URL}/chat/completions", {
         "model": MODEL,
         "messages": [
-            {"role": "user", "content": "Use the divide tool to divide 10 by 0. Reply with just the number."}
+            {"role": "user", "content": "Use the divide tool to divide 10 by 0, then tell me what happened."}
         ],
-        "seed": 42,
-    }, timeout=TIMEOUT)
-    assert resp.status_code == 500
-    data = resp.json()
-    assert data["error"]["type"] == "server_error"
-    message = data["error"]["message"].lower()
-    assert "divide" in message
-    assert "division by zero" in message
+    }, TIMEOUT)
+    choice = data["choices"][0]
+    assert choice["finish_reason"] == "stop"
+    content = choice["message"]["content"]
+    assert content and content.strip(), "model must produce a recovery answer, not empty content"
+    # The raw tool-call JSON must not leak to the client as the answer.
+    assert '"tool_calls"' not in content
 
 
 def test_mcp_tool_timeout_returns_structured_error():
@@ -377,6 +502,220 @@ def test_mcp_tool_timeout_returns_structured_error():
     assert "timed out" in message
 
 
+def test_mcp_crashed_server_does_not_kill_apfel():
+    """A crashed MCP server must not take down the whole apfel process (#215).
+
+    crashing_mcp_server.py answers the handshake (so the tool registers and the
+    server is healthy) then exits before any tools/call. When the model then
+    calls the tool, apfel writes to a pipe whose read end is closed. Before the
+    fix that raised SIGPIPE and killed the whole --serve process (exit 141);
+    now the write fails with a recoverable MCPError and the HTTP server stays up.
+    """
+    with running_custom_mcp_server(FIXTURES / "crashing_mcp_server.py") as api_url:
+        base_url = api_url.rsplit("/", 1)[0]
+        # A large product the on-device model will route to the tool rather than
+        # computing in-head, so the write to the dead pipe actually happens.
+        resp = httpx.post(f"{api_url}/chat/completions", json={
+            "model": MODEL,
+            "messages": [
+                {"role": "user", "content": "Use the multiply tool to compute 247 times 83. Reply with just the number."}
+            ],
+            "seed": 42,
+            "max_tokens": 128,
+        }, timeout=30)
+        # The individual request surfaces a structured 500 (the dead pipe write
+        # is a tool-execution failure), not a connection reset.
+        assert resp.status_code == 500, f"Expected 500, got {resp.status_code}: {resp.text[:200]}"
+        data = resp.json()
+        assert data["error"]["type"] == "server_error"
+        # The server must still be alive and serving after the crashed-pipe write.
+        health = httpx.get(f"{base_url}/health", timeout=5)
+        assert health.status_code == 200, "apfel server died after writing to a crashed MCP server (SIGPIPE)"
+        assert health.json()["model_available"] is True
+
+
+def test_mcp_duplicate_tool_names_warn_and_dedupe():
+    """Two --mcp servers exposing the same tool name must warn loudly and keep
+    the first registration; the shadowed duplicate is dropped (#239).
+
+    Model-free: only inspects the startup diagnostics and /health, so it runs on
+    CI too (no Apple Intelligence needed).
+    """
+    scripts = [FIXTURES / "dup_tool_server_a.py", FIXTURES / "dup_tool_server_b.py"]
+    with running_mcp_servers(scripts) as (api_url, read_log):
+        base_url = api_url.rsplit("/", 1)[0]
+        health = httpx.get(f"{base_url}/health", timeout=5)
+        assert health.status_code == 200
+        log = read_log()
+
+    # Loud collision warning naming the tool and both servers, first-wins.
+    assert "shared_tool" in log, f"no collision warning for shared_tool in log:\n{log}"
+    assert "dup_tool_server_a.py" in log
+    assert "dup_tool_server_b.py" in log
+    assert "ignoring" in log.lower(), f"warning must state the duplicate is ignored:\n{log}"
+    # Both servers still registered their unique tools.
+    assert "only_a" in log
+    assert "only_b" in log
+
+
+def test_mcp_server_chained_tool_calls_do_not_leak_json():
+    """The server MCP auto-execute path must run the CLI's bounded re-detection
+    loop: if the model answers the tool-result follow-up with another tool call,
+    it is executed and re-prompted, and any trailing tool-call JSON is stripped
+    on cap exhaustion - never returned as message.content with finish_reason
+    stop (#240).
+    """
+    data = post_chat_rotating_seeds(f"{API_URL}/chat/completions", {
+        "model": MODEL,
+        "messages": [
+            {"role": "user", "content": "First use the multiply tool to compute 6 times 7, then use the add tool to add 100 to that result. Give me the final number."}
+        ],
+        "max_tokens": 300,
+    }, TIMEOUT)
+    choice = data["choices"][0]
+    content = choice["message"]["content"]
+    # Whether or not the model chains, raw tool-call protocol JSON must never
+    # reach the client as the answer.
+    assert '"tool_calls"' not in content, f"raw tool-call JSON leaked to client: {content[:300]}"
+    assert content and content.strip(), "must produce a natural-language answer"
+
+
+def test_mcp_huge_tool_output_is_truncated_not_fatal():
+    """A tool result far larger than the 4096-token window must be truncated
+    head+tail before the follow-up prompt, not overflow or be dropped (#221).
+
+    Before the fix the un-truncated ~40 KB result overflowed the context window
+    after the tool ran (CLI) or was dropped whole by the context trimmer while
+    the prompt still referenced it (server -> hallucination). Now the request
+    completes with a real answer instead of a context-overflow 500.
+    """
+    with running_custom_mcp_server(FIXTURES / "huge_output_mcp_server.py") as api_url:
+        data = post_chat_rotating_seeds(f"{api_url}/chat/completions", {
+            "model": MODEL,
+            "messages": [
+                {"role": "user", "content": "Call the fetch_document tool, then summarize the document in one sentence."}
+            ],
+            "max_tokens": 200,
+        }, TIMEOUT)
+    choice = data["choices"][0]
+    content = choice["message"]["content"]
+    assert content and content.strip(), "must produce an answer from the truncated result"
+    assert "context window" not in content.lower(), "must not report a context overflow as the answer"
+    assert '"tool_calls"' not in content, "raw tool-call JSON must not leak"
+
+
+def test_mcp_timed_out_connection_is_deregistered():
+    """A timed-out MCP connection must be deregistered, not left permanently dead (#216).
+
+    hanging_mcp_server.py sleeps forever on tools/call. The first call times out
+    (~5s) and apfel tears the connection down. Before the fix the tool stayed in
+    the routing tables, so a second call routed to the dead connection and failed
+    with "MCP server process is not running". After the fix the connection is
+    deregistered: the tool is removed from allTools(), the model is no longer
+    offered it, and the second call succeeds (200) instead of hitting the corpse.
+    """
+    with running_custom_mcp_server(FIXTURES / "hanging_mcp_server.py") as api_url:
+        base_url = api_url.rsplit("/", 1)[0]
+        first = httpx.post(f"{api_url}/chat/completions", json={
+            "model": MODEL,
+            "messages": [
+                {"role": "user", "content": "Use the multiply tool to compute 247 times 83. Reply with just the number."}
+            ],
+            "seed": 42,
+            "max_tokens": 128,
+        }, timeout=30)
+        assert first.status_code == 500
+        assert "timed out" in first.json()["error"]["message"].lower()
+
+        # Server stays healthy after the teardown.
+        assert httpx.get(f"{base_url}/health", timeout=5).status_code == 200
+
+        # Second call must NOT route to the dead connection. Deregistration
+        # removed the tool, so the model answers directly (247*83 = 20501).
+        second = httpx.post(f"{api_url}/chat/completions", json={
+            "model": MODEL,
+            "messages": [
+                {"role": "user", "content": "Use the multiply tool to compute 247 times 83. Reply with just the number."}
+            ],
+            "seed": 42,
+            "max_tokens": 128,
+        }, timeout=30)
+        assert second.status_code == 200, \
+            f"Second call did not succeed - dead tool still registered? {second.status_code}: {second.text[:200]}"
+        assert "not running" not in second.text.lower(), \
+            f"Second call routed to the deregistered dead connection: {second.text[:200]}"
+
+
+def test_mcp_noisy_server_handshake_survives_notifications():
+    """Server->client noise before responses must not desync the handshake (#217).
+
+    noisy_mcp_server.py emits notifications/message lines and a ping request
+    before every response (what FastMCP's ctx.info() does). Before the id
+    correlation fix, apfel parsed the first notification as the initialize
+    response, MCP startup failed, and the server never became healthy. This
+    test is model-free: it only exercises initialize + tools/list.
+    """
+    with running_custom_mcp_server(FIXTURES / "noisy_mcp_server.py") as api_url:
+        base_url = api_url.rsplit("/", 1)[0]
+        health = httpx.get(f"{base_url}/health", timeout=5)
+        assert health.status_code == 200, \
+            "apfel did not come up with a noisy MCP server - id correlation broken?"
+
+
+def test_mcp_noisy_server_tool_call_succeeds():
+    """Tool calls through a notification-noisy MCP server return the real result (#217).
+
+    Before the fix, the notification line was parsed as the tools/call
+    response ("Missing content" error) and the real response stayed buffered,
+    desyncing every later call.
+    """
+    with running_custom_mcp_server(FIXTURES / "noisy_mcp_server.py") as api_url:
+        data = post_chat_rotating_seeds(f"{api_url}/chat/completions", {
+            "model": MODEL,
+            "messages": [
+                {"role": "user", "content": "Use the multiply tool to compute 247 times 83. Reply with just the number."}
+            ],
+            "max_tokens": 128,
+        }, 30)
+        assert data["choices"][0]["finish_reason"] == "stop"
+        content = data["choices"][0]["message"]["content"] or ""
+        assert "20501" in content or "20,501" in content, \
+            f"Expected 20501 through the noisy server, got: {content}"
+
+
+def test_mcp_concurrent_tool_calls_do_not_cross_deliver():
+    """Two simultaneous tool calls must each get their own result (#218).
+
+    Runs against the standing 11435 calculator server (--max-concurrent
+    default 5). Before the per-connection send+receive serialization, the two
+    detached stdio exchanges interleaved on one pipe: request B could consume
+    request A's response line (swapped or lost results).
+    """
+    import concurrent.futures
+
+    def ask(prompt):
+        return post_chat_rotating_seeds(f"{API_URL}/chat/completions", {
+            "model": MODEL,
+            "messages": [{"role": "user", "content": prompt}],
+            "max_tokens": 128,
+        }, TIMEOUT)
+
+    with concurrent.futures.ThreadPoolExecutor(max_workers=2) as pool:
+        fut_multiply = pool.submit(
+            ask, "Use the multiply tool to compute 247 times 83. Reply with just the number.")
+        fut_add = pool.submit(
+            ask, "Use the add function to add 111 and 222. Reply with just the number.")
+        data_multiply = fut_multiply.result()
+        data_add = fut_add.result()
+
+    multiply_content = data_multiply["choices"][0]["message"]["content"] or ""
+    add_content = data_add["choices"][0]["message"]["content"] or ""
+    assert "20501" in multiply_content or "20,501" in multiply_content, \
+        f"multiply got the wrong result (cross-delivered?): {multiply_content}"
+    assert "333" in add_content, \
+        f"add got the wrong result (cross-delivered?): {add_content}"
+
+
 # ============================================================================
 # MCP tool routing (different calculator tools)
 # ============================================================================
@@ -391,15 +730,20 @@ def test_mcp_multiply_returns_correct_result(multiply_247x83_response):
 
 
 def test_mcp_sqrt_returns_correct_result():
-    """Sqrt tool: sqrt(144) = 12."""
-    resp = httpx.post(f"{API_URL}/chat/completions", json={
+    """Sqrt tool: sqrt(144) = 12.
+
+    The macOS 26.5.2 model guardrail-refuses this prompt on some sampling
+    trajectories (seed 42 became a deterministic refusal; unseeded runs
+    refuse intermittently). The property under test is that the tool result
+    round-trips into the final answer, not that a particular seed avoids the
+    guardrail, so rotate seeds on refusal and assert on the first real
+    answer (#320, helper shared via conftest per #324)."""
+    data = post_chat_rotating_seeds(f"{API_URL}/chat/completions", {
         "model": MODEL,
         "messages": [
             {"role": "user", "content": "Use the sqrt tool to compute the square root of 144. Reply with just the number."}
         ],
-        "seed": 42,
-    }, timeout=TIMEOUT)
-    data = resp.json()
+    }, TIMEOUT)
     content = data["choices"][0]["message"]["content"] or ""
     assert data["choices"][0]["finish_reason"] == "stop"
     assert_no_raw_tool_calls(content)
@@ -418,17 +762,14 @@ def test_mcp_tool_returns_stop_not_tool_calls(add_tool_response):
 
 def test_mcp_auto_execute_preserves_conversation_context():
     """Final MCP answer must retain prior conversation context, not just the last prompt."""
-    resp = httpx.post(f"{API_URL}/chat/completions", json={
+    data = post_chat_rotating_seeds(f"{API_URL}/chat/completions", {
         "model": MODEL,
         "messages": [
             {"role": "user", "content": "Remember this exact code word for later replies: MANGO."},
             {"role": "assistant", "content": "I will remember MANGO."},
             {"role": "user", "content": "Use the multiply tool to compute 6 times 7. Reply with exactly the remembered code word, one space, and the number."}
         ],
-        "seed": 42,
-    }, timeout=TIMEOUT)
-    assert resp.status_code == 200
-    data = resp.json()
+    }, TIMEOUT)
     assert data["choices"][0]["finish_reason"] == "stop"
     content = (data["choices"][0]["message"]["content"] or "").strip()
     assert "42" in content, content
@@ -535,15 +876,17 @@ def test_mcp_health_endpoint(health_response):
 # ============================================================================
 
 def test_mcp_invalid_model_rejected():
-    """Invalid model name returns 400 with helpful error (only apple-foundationmodel accepted)."""
+    """Invalid model name returns 404 model_not_found (OpenAI parity, #236)."""
     resp = httpx.post(f"{API_URL}/chat/completions", json={
         "model": "gpt-4o",
         "messages": [{"role": "user", "content": "Say OK."}],
     }, timeout=TIMEOUT)
-    assert resp.status_code == 400
+    assert resp.status_code == 404
     data = resp.json()
     assert "does not exist" in data["error"]["message"]
     assert "apple-foundationmodel" in data["error"]["message"]
+    assert data["error"]["code"] == "model_not_found"
+    assert data["error"]["param"] == "model"
 
 
 def test_mcp_empty_messages_rejected():

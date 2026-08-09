@@ -18,6 +18,11 @@ import time
 import httpx
 import pytest
 
+# Whole-suite marker: manipulates global launchd/brew service state on the
+# shared service port - must never run concurrently with other suites (#374).
+pytestmark = pytest.mark.serial
+
+
 ROOT = pathlib.Path(__file__).resolve().parents[2]
 SERVICE_PORT = 11434
 SERVICE_URL = f"http://127.0.0.1:{SERVICE_PORT}"
@@ -95,6 +100,7 @@ def test_brew_service_models(brew_service):
     assert any(m["id"] == "apple-foundationmodel" for m in data["data"])
 
 
+@pytest.mark.model
 def test_brew_service_chat_completion(brew_service):
     """Brew service handles a chat completion request."""
     resp = httpx.post(

@@ -1,27 +1,36 @@
 """
+<<<<<<< HEAD
 apfel-plus Integration Tests — TDD RED batch (branch tdd/red-tests-167-183)
 
 DELIBERATELY FAILING tests, one per ticket that cannot be reached from the
 pure-Swift unit target (see Package.swift: apfel-plus-tests depends only on
 ApfelCore + ApfelCLI, so executable-target bugs and server/CLI features are
 red-tested here at the wire/CLI boundary).
+=======
+apfel Integration Tests - regression guards for tickets #167-#183 and #219/#243
 
-These assert the CORRECT behaviour described in each GitHub issue. The fix that
-makes them green is a SEPARATE follow-up task — do not implement here.
+These began life as the TDD RED batch (branch tdd/red-tests-167-183). Every
+ticket they cover is now FIXED and shipped; the tests are kept as REGRESSION
+GUARDS so the behaviour cannot silently regress. They live here (not in the
+pure-Swift unit target) because they exercise the wire/CLI boundary of the
+FoundationModels-coupled executable target, which apfel-tests cannot import
+(see Package.swift: apfel-tests depends only on ApfelCore + ApfelCLI).
+>>>>>>> upstream/main
 
-Covered (real assertions, red now):
-  #167 json_schema, #169 prewarm (model-free),
-  #171 streamed structured output, #176 tool-def token undercount
+Two kinds of guard:
+  - Wire-level behaviour guards (real requests): #167 json_schema, #169 prewarm
+    (model-free), #171 streamed structured output, #176 tool-def token count,
+    #219 union schemas, #243 fractional number output.
+  - Source-level seam pins: where the failure condition is not externally
+    triggerable from a client (a mid-stream refusal / retry, an unbounded
+    summary), the deterministic coverage lives next to the code and is exercised
+    by the pure-Swift unit suite; the guard here pins the source seam so the
+    wiring cannot be removed. Covers #168, #175, #179, #182.
 
-Covered (Tier-3 loud placeholders — failure condition not externally
-observable/triggerable, so a deterministic test needs a fix-phase testability
-seam in the executable target; these pytest.fail rather than risk a false green):
-  #168 top_p/greedy mapping, #175 summarize budget, #179 refusal accounting,
-  #182 streaming-retry stdout
-
-Model-dependent tests are FAILING, not skipped — consistent with the project's
-"never skip" rule. They run under local `make test` where Apple Intelligence is
-present. #169 is model-free and runs anywhere.
+Model-dependent tests FAIL rather than skip when the model is absent, consistent
+with the project's "never skip" rule. They run under local `make test` /
+`make release` where Apple Intelligence is present. #169 and the source-seam
+pins are model-free and run anywhere.
 
 Run: python3 -m pytest Tests/integration/test_tdd_red.py -v
 """
@@ -31,6 +40,13 @@ import pathlib
 
 import httpx
 import pytest
+
+# Whole-suite marker: these tests drive real on-device generation (or, for
+# the permit/benchmark suites, need Apple Intelligence up); GitHub CI cannot
+# run them (CLAUDE.md "What GitHub CI CANNOT run"). Keeps -m "not model" a
+# complete, correct model-free selector for the fast preflight phase (#374).
+pytestmark = pytest.mark.model
+
 
 ROOT = pathlib.Path(__file__).resolve().parents[2]
 BINARY = ROOT / ".build" / "release" / "apfel-plus"
@@ -224,9 +240,10 @@ def test_176_tool_definitions_count_toward_prompt_tokens():
 # ---------------------------------------------------------------------------
 
 def test_175_summarize_keeps_prompt_within_budget():
-    """#175: the summarize strategy must verify the final assembly fits the
-    budget (unbounded summary + no final check can overflow).
+    """#175: the summarize strategy must bound the summary AND verify the final
+    assembly fits the budget (an unbounded summary + no final check can overflow).
 
+<<<<<<< HEAD
     Verified NOT reliably triggerable at the wire boundary: whether the model
     emits a summary long enough to overflow the precise (budget - output
     reserve) window is non-deterministic, so a coarse prompt_tokens assertion is
@@ -243,8 +260,32 @@ def test_175_summarize_keeps_prompt_within_budget():
     proves the budget check; that assertion lives next to the code in the
     executable target. This wire-level placeholder stays GREEN; it can never
     deterministically reach the overflow path.
+=======
+    Not reliably triggerable at the wire boundary: whether the model emits a
+    summary long enough to overflow the precise (budget - output reserve) window
+    is non-deterministic, so a coarse prompt_tokens assertion would be a false
+    green. The deterministic coverage lives next to the code (trimWithSummary
+    takes an injectable `summarize` closure so a stubbed huge summary proves the
+    budget check). This guard pins the source seam so the two-part fix cannot be
+    silently removed, mirroring the test_179 source-seam approach.
+>>>>>>> upstream/main
     """
-    pass
+    summarizer = (ROOT / "Sources" / "Summarizer.swift").read_text()
+    # Part 1: the summary is bounded so it cannot grow unbounded.
+    assert "GenerationOptions(maximumResponseTokens: maxTokens)" in summarizer, (
+        "generateSummary must bound the summary length via maximumResponseTokens (#175)")
+    assert "budget / summaryBudgetFraction" in summarizer, (
+        "the summary token cap must be a fraction of the budget (#175)")
+    # Part 2: the assembled [summary]+recent transcript is re-checked against the
+    # budget, with a newest-first fallback when it still does not fit.
+    assert "guard await fitsTranscriptBudget(" in summarizer, (
+        "trimWithSummary must verify the assembled transcript fits the budget (#175)")
+    assert "return await trimNewestFirst(" in summarizer, (
+        "trimWithSummary must fall back to newest-first when the summary overflows (#175)")
+    # The injectable seam that makes the budget check unit-testable must exist.
+    assert "summarize: Summarizer =" in summarizer, (
+        "trimWithSummary must expose an injectable `summarize` closure so a stubbed "
+        "huge summary can prove the budget check without the live model (#175)")
 
 
 # ---------------------------------------------------------------------------
@@ -302,3 +343,99 @@ def test_182_streaming_retry_prints_output_once():
     a client, so there is nothing left to assert at the wire boundary here.
     """
     pass
+
+
+# ---------------------------------------------------------------------------
+# #219 anyOf/oneOf/type-arrays - nullable unions parse, unsupported ones 400
+# ---------------------------------------------------------------------------
+
+def test_219_json_schema_unsupported_union_returns_400():
+    """An unsupported union in a json_schema must be an honest 400, not a silent
+    accept of an empty (unconstrained) schema (#219).
+
+    Server-only: schema conversion fails before the model is invoked, so this
+    runs anywhere the server is up.
+    """
+    schema = {
+        "type": "object",
+        "properties": {"x": {"anyOf": [{"type": "string"}, {"type": "number"}]}},
+        "required": ["x"],
+    }
+    resp = _chat({
+        "model": MODEL,
+        "messages": [{"role": "user", "content": "give me an x"}],
+        "response_format": {
+            "type": "json_schema",
+            "json_schema": {"name": "Bad", "schema": schema},
+        },
+    })
+    assert resp.status_code == 400, (
+        f"unsupported union schema must 400, got {resp.status_code}: {resp.text}")
+    assert resp.json()["error"]["type"] == "invalid_request_error"
+
+
+def test_219_json_schema_nullable_property_conforms():
+    """A nullable (Optional[...]) property parses and generation is constrained
+    to the real schema, not an empty object (#219). Model-dependent."""
+    schema = {
+        "type": "object",
+        "properties": {
+            "name": {"type": "string"},
+            "nickname": {"anyOf": [{"type": "string"}, {"type": "null"}]},
+        },
+        "required": ["name", "nickname"],
+        "additionalProperties": False,
+    }
+    resp = _chat({
+        "model": MODEL,
+        "messages": [{"role": "user", "content": "Return a person named Alice with no nickname."}],
+        "response_format": {
+            "type": "json_schema",
+            "json_schema": {"name": "Person", "schema": schema, "strict": True},
+        },
+    })
+    assert resp.status_code == 200, (
+        f"nullable-property json_schema should succeed, got {resp.status_code}: {resp.text}")
+    data = json.loads(resp.json()["choices"][0]["message"]["content"])
+    assert "name" in data, f"schema must constrain output to real properties, got {data}"
+
+
+# ---------------------------------------------------------------------------
+# #243 json_schema "number" must allow fractional output (was generated as Int)
+# ---------------------------------------------------------------------------
+
+def test_243_json_schema_number_allows_fractional():
+    """A json_schema {"type":"number"} property must be able to produce a
+    fractional value like 9.99. Previously the IR conflated integer+number and
+    mapped both to Int, so fractional outputs were silently unreachable (#243).
+    Model-dependent."""
+    schema = {
+        "type": "object",
+        "properties": {"price": {"type": "number"}},
+        "required": ["price"],
+        "additionalProperties": False,
+    }
+    # The fix makes fractional values POSSIBLE; the model is not forced to
+    # emit one on any single sample. Ask for an exact fractional price and
+    # allow a few attempts so scheduler/sampling noise cannot flake a release
+    # run (#264 discipline) - with the old Int mapping every attempt returns a
+    # whole number, so the loop still fails deterministically pre-fix.
+    last_price = None
+    for _ in range(3):
+        resp = _chat({
+            "model": MODEL,
+            "messages": [{"role": "user", "content": "The price is exactly 9.99 dollars. Return the price."}],
+            "response_format": {
+                "type": "json_schema",
+                "json_schema": {"name": "Priced", "schema": schema, "strict": True},
+            },
+        })
+        assert resp.status_code == 200, f"number json_schema should succeed, got {resp.status_code}: {resp.text}"
+        data = json.loads(resp.json()["choices"][0]["message"]["content"])
+        last_price = data["price"]
+        if isinstance(last_price, float) and last_price != int(last_price):
+            return
+    raise AssertionError(
+        f"a JSON Schema 'number' must permit a fractional value; 3 attempts all "
+        f"returned whole numbers, last was {last_price!r} (Int mapping would make "
+        "fractions unreachable)")

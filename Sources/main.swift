@@ -36,12 +36,33 @@ func exitCode(for error: ApfelError) -> Int32 {
     ApfelExitCodes.code(for: error)
 }
 
+// MARK: - Locale
+
+// Adopt the user's LC_CTYPE from the environment (LANG/LC_*). apfel otherwise
+// runs in the "C" locale, and libedit's multibyte handling (mbrtowc/ct_encode)
+// keys off LC_CTYPE - without this, chat line editing of non-ASCII input
+// (backspace/arrow over "ü"/emoji) operates byte-wise and corrupts the line.
+// Must run before any ChatLineEditor is constructed (#256).
+setlocale(LC_CTYPE, "")
+
 // MARK: - Signal Handling
 
 apfel_install_sigint_exit_handler(isatty(STDOUT_FILENO) != 0 ? 1 : 0)
 
+<<<<<<< HEAD
 // True when stdin is a FIFO/pipe (`command | apfel-plus`) vs a regular file
 // redirect (`apfel-plus < file`). We only suggest `2>&1` for the pipe case;
+=======
+// Ignore SIGPIPE process-wide. A crashed MCP server (or any closed pipe/socket
+// peer) must not kill apfel: writes to a dead pipe would otherwise raise SIGPIPE
+// with the default disposition and terminate the process (exit 141), taking down
+// the whole --serve HTTP server. With SIG_IGN the write instead fails with EPIPE,
+// which the throwing write path in MCPClient maps to a recoverable error (#215).
+signal(SIGPIPE, SIG_IGN)
+
+// True when stdin is a FIFO/pipe (`command | apfel`) vs a regular file
+// redirect (`apfel < file`). We only suggest `2>&1` for the pipe case;
+>>>>>>> upstream/main
 // regular files don't need that advice.
 func stdinIsPipe() -> Bool {
     var st = stat()
@@ -49,10 +70,29 @@ func stdinIsPipe() -> Bool {
     return (st.st_mode & S_IFMT) == S_IFIFO
 }
 
+/// Read all of stdin as raw bytes — works for piped text and piped binary files alike.
+func readStdinData() -> Data {
+    (try? FileHandle.standardInput.readToEnd()) ?? Data()
+}
+
+/// Turn piped stdin into prompt text: a piped PDF or image is extracted via lesbar
+/// (OCR + "what the image is about", same as `-f`); anything else is decoded as UTF-8
+/// text — apfel's existing pipe behaviour. Empty stdin returns "".
+/// Throws `CLIParseError` when the bytes are a PDF/image but extraction fails.
+func stdinPromptText(_ data: Data) throws -> String {
+    if data.isEmpty { return "" }
+    if let extracted = try LesbarFileReader.extractPipedIfBinary(data) {
+        return extracted
+    }
+    return (String(data: data, encoding: .utf8) ?? "")
+        .trimmingCharacters(in: .whitespacesAndNewlines)
+}
+
 // MARK: - Argument Parsing
 
 let rawArgs = Array(CommandLine.arguments.dropFirst())
 
+<<<<<<< HEAD
 // No-args + stdin-pipe fast path: `echo "prompt" | apfel-plus` with no flags.
 // Must stay above the parse() call because it needs isatty + await singlePrompt
 // before any parsing happens.
@@ -78,13 +118,30 @@ if rawArgs.isEmpty {
         }
     }
     printUsage()
+=======
+// No args AND stdin is a TTY: nothing to read, nothing to do -> usage + exit 2.
+// This is the only no-args special case. The bare-pipe case (`echo hi | apfel`)
+// used to be a fast path that ran BEFORE parse() and therefore dropped every
+// APFEL_* env var and skipped the model-availability gate (#222). It now flows
+// through the normal parse()/dispatch path below.
+if rawArgs.isEmpty && isatty(STDIN_FILENO) != 0 {
+    printUsage(to: stderr)
+>>>>>>> upstream/main
     exit(exitUsageError)
 }
+
+// True for the bare-pipe invocation (`echo hi | apfel` with no flags). It
+// streams by default to preserve the historical output behavior of that path.
+let noArgsPipe = rawArgs.isEmpty
 
 // Pure, testable parsing. Errors land here as CLIParseError.
 let parsed: CLIArguments
 do {
-    parsed = try CLIArguments.parse(rawArgs, env: ProcessInfo.processInfo.environment)
+    parsed = try CLIArguments.parse(
+        rawArgs,
+        env: ProcessInfo.processInfo.environment,
+        extractFile: { try LesbarFileReader.extractForPrompt(path: $0) }
+    )
 } catch let error as CLIParseError {
     printError(error.message)
     exit(exitUsageError)
@@ -103,6 +160,11 @@ case .release:
     exit(exitSuccess)
 case .demos:
     exit(runDemosInstall(target: parsed.demosTarget))
+case .completions:
+    if let shell = parsed.completionsShell {
+        print(ShellCompletions.generate(for: shell), terminator: "")
+    }
+    exit(exitSuccess)
 default:
     break
 }
@@ -113,25 +175,78 @@ if parsed.quiet { quietMode = true }
 if parsed.noColor { noColorFlag = true }
 if parsed.debug { ApfelDebugConfiguration.isEnabled = true }
 
+// Surface non-fatal parse warnings (invalid APFEL_* env values ignored in
+// favor of defaults) on stderr unless --quiet. Collected by parse() so it
+// stays pure; printed here (#254).
+if !quietMode {
+    for warning in parsed.warnings {
+        printStderr("\(styledErr("apfel:", .yellow)) \(warning)")
+    }
+}
+
+// Prewarm the model concurrently with input I/O (#364). Fire-and-forget so
+// the model cold-start overlaps the stdin read / conversation parsing below
+// instead of following it serially; in chat mode it overlaps the user typing
+// the first message. TokenCounter.prewarm() no-ops when the model is
+// unavailable, so the exit-5 path is untouched. The server path prewarms in
+// startServer (#169), never here.
+if PrewarmDecision.shouldPrewarm(mode: parsed.mode) {
+    debugLog("prewarm", "firing model prewarm before input read (mode=\(parsed.mode.rawValue))")
+    Task.detached(priority: .userInitiated) {
+        _ = await TokenCounter.shared.prewarm()
+    }
+}
+
 // Build the prompt: positional args + piped stdin + attached files.
 var prompt = parsed.prompt
 var fileContents = parsed.fileContents
+var pipedContent: String? = nil
 
-// Read stdin when piped (single/stream) -- as the prompt (no args) or prepended to the prompt.
-if parsed.mode.acceptsStdinInput && isatty(STDIN_FILENO) == 0 {
-    var lines: [String] = []
-    while let line = readLine(strippingNewline: false) {
-        lines.append(line)
+// One-shot multi-turn (#363): resolve the conversation JSON. `--messages -`
+// consumes piped stdin as the conversation, so the prompt-stdin block below
+// is skipped for every --messages invocation.
+var messagesJSON = parsed.messagesJSON
+if parsed.messagesFromStdin {
+    guard isatty(STDIN_FILENO) == 0 else {
+        printError("--messages - requires a piped JSON conversation on stdin")
+        exit(exitUsageError)
     }
-    let stdinContent = lines.joined().trimmingCharacters(in: .whitespacesAndNewlines)
+    let raw = String(data: readStdinData(), encoding: .utf8) ?? ""
+    do {
+        _ = try MessagesInput.decode(raw)
+    } catch let e as MessagesInput.Error {
+        printError("invalid --messages JSON from stdin: \(e.message)")
+        exit(exitUsageError)
+    }
+    messagesJSON = raw
+}
+
+// Read stdin when piped (single/stream/count-tokens) -- as the prompt (no args) or prepended to the prompt.
+if messagesJSON == nil && parsed.mode.acceptsStdinInput && isatty(STDIN_FILENO) == 0 {
+    let stdinContent: String
+    do {
+        stdinContent = try stdinPromptText(readStdinData())
+    } catch let error as CLIParseError {
+        printError(error.message)
+        exit(exitUsageError)
+    }
     if !stdinContent.isEmpty {
+        pipedContent = stdinContent
         if prompt.isEmpty && fileContents.isEmpty {
             prompt = stdinContent
         } else {
             fileContents.append(stdinContent)
         }
+<<<<<<< HEAD
     } else if !prompt.isEmpty && !quietMode && stdinIsPipe() {
         printStderr("\(styled("apfel-plus:", .yellow)) piped input was empty - if the command prints to stderr, try: command 2>&1 | apfel-plus")
+=======
+    } else if !quietMode && stdinIsPipe() {
+        // Empty pipe: hint about stderr redirection. Fires whether or not a
+        // prompt was given, so the bare-pipe case (`somecmd | apfel`, no args)
+        // still gets the hint now that it flows through this path (#152, #222).
+        printStderr("\(styledErr("apfel:", .yellow)) piped input was empty - if the command prints to stderr, try: command 2>&1 | apfel")
+>>>>>>> upstream/main
     }
 }
 
@@ -143,6 +258,15 @@ if !fileContents.isEmpty {
     } else {
         prompt = combined + "\n\n" + prompt
     }
+}
+
+// Debuggable: with --debug, show exactly what each file extracted to and the full
+// prompt that goes to the model, so you can see what apfel actually puts to the API.
+if ApfelDebugConfiguration.isEnabled {
+    for attachment in parsed.fileAttachments {
+        debugLog("extract", "\(attachment.path) -> \(attachment.content.count) chars:\n\(attachment.content)")
+    }
+    debugLog("prompt", "final prompt to model (\(prompt.count) chars):\n\(prompt)")
 }
 
 // MARK: - Dispatch
@@ -175,6 +299,15 @@ let serverAllowedOrigins: [String] = {
     return origins
 }()
 
+// Reject empty-prompt single/stream invocations BEFORE the model-availability
+// gate, so "nothing to do" is a usage error (exit 2) regardless of whether the
+// model is available. This preserves the old bare-pipe behavior: an empty pipe
+// with no args prints the hint above and exits 2 without touching the model.
+if (parsed.mode == .single || parsed.mode == .stream) && prompt.isEmpty && messagesJSON == nil {
+    printError("no prompt provided")
+    exit(exitUsageError)
+}
+
 // Check model availability for modes that need it. If unavailable, surface
 // the specific reason (appleIntelligenceNotEnabled / deviceNotEligible /
 // modelNotReady) so users know exactly what to fix. See #59.
@@ -185,7 +318,11 @@ let serverAllowedOrigins: [String] = {
 // errors there surface through ApfelError.classify rather than re-implementing
 // the check.
 switch parsed.mode {
+<<<<<<< HEAD
 case .modelInfo, .serve, .update, .autostart:
+=======
+case .modelInfo, .serve, .update, .countTokens:
+>>>>>>> upstream/main
     break
 default:
     if parsed.backend == .onDevice {
@@ -211,7 +348,16 @@ if !parsed.mcpServerPaths.isEmpty {
         exit(exitRuntimeError)
     }
 }
-defer { Task { await mcpManager?.shutdown() } }
+
+// Shut MCP servers down before the process exits. This must be an awaited call
+// on every exit path, NOT a `defer { Task { ... } }`: async main returns and the
+// process exits before an unstructured Task is ever scheduled, so children would
+// only die on stdin EOF (a server ignoring EOF is orphaned) and the remote DELETE
+// would never fire. terminate() + bounded waitUntilExit() reaps locals; the
+// remote branch awaits its DELETE (#246).
+func shutdownMCP() async {
+    await mcpManager?.shutdown()
+}
 
 do {
     switch parsed.mode {
@@ -251,27 +397,93 @@ do {
         try await runBenchmarks()
 
     case .chat:
-        try await chat(systemPrompt: parsed.systemPrompt, options: sessionOpts, mcpManager: mcpManager, contextStatus: parsed.contextStatus)
+        // `-f file` / piped / positional content is merged into `prompt` above;
+        // seed it into the chat context instead of dropping it silently (#370).
+        try await chat(systemPrompt: parsed.systemPrompt, initialContext: prompt.isEmpty ? nil : prompt, options: sessionOpts, mcpManager: mcpManager, contextStatus: parsed.contextStatus)
 
     case .stream:
-        guard !prompt.isEmpty else {
-            printError("no prompt provided")
-            exit(exitUsageError)
+        if let messagesJSON {
+            // --messages --stream: stream the next assistant turn (#363).
+            try await messagesPrompt(
+                messagesJSON: messagesJSON, systemPrompt: parsed.systemPrompt,
+                stream: true, schemaJSON: parsed.schemaJSON, schemaName: parsed.schemaName,
+                options: sessionOpts, mcpManager: mcpManager)
+        } else {
+            guard !prompt.isEmpty else {
+                printError("no prompt provided")
+                await shutdownMCP()
+                exit(exitUsageError)
+            }
+            try await singlePrompt(prompt, systemPrompt: parsed.systemPrompt, stream: true, options: sessionOpts, mcpManager: mcpManager)
         }
-        try await singlePrompt(prompt, systemPrompt: parsed.systemPrompt, stream: true, options: sessionOpts, mcpManager: mcpManager)
 
     case .single:
-        guard !prompt.isEmpty else {
+        // --code (#373): append the steering directive so the model answers
+        // with exactly one fenced block; the deterministic crop happens in
+        // singlePrompt/messagesPrompt regardless of compliance.
+        let effectiveSystemPrompt = parsed.codeOnly
+            ? [parsed.systemPrompt, CodeCropper.steeringDirective].compactMap { $0 }.joined(separator: "\n\n")
+            : parsed.systemPrompt
+        if let messagesJSON {
+            // --messages: one-shot multi-turn (#363); composes with --schema.
+            let status = try await messagesPrompt(
+                messagesJSON: messagesJSON, systemPrompt: effectiveSystemPrompt,
+                stream: false, schemaJSON: parsed.schemaJSON, schemaName: parsed.schemaName,
+                options: sessionOpts, mcpManager: mcpManager, codeOnly: parsed.codeOnly)
+            if status != 0 {
+                await shutdownMCP()
+                exit(status)
+            }
+        } else if prompt.isEmpty {
             printError("no prompt provided")
+            await shutdownMCP()
+            exit(exitUsageError)
+        } else if let schemaJSON = parsed.schemaJSON {
+            // --schema: schema-guaranteed structured output (#361). Validated
+            // at parse time; MCP/stream/chat combinations are rejected there.
+            try await structuredSinglePrompt(
+                prompt, systemPrompt: parsed.systemPrompt,
+                schemaJSON: schemaJSON, schemaName: parsed.schemaName ?? "schema",
+                options: sessionOpts)
+        } else {
+            // The bare-pipe case (`echo hi | apfel`) streams to preserve its
+            // historical output behavior; an explicit prompt does not (#222).
+            let status = try await singlePrompt(prompt, systemPrompt: effectiveSystemPrompt, stream: noArgsPipe, options: sessionOpts, mcpManager: mcpManager, codeOnly: parsed.codeOnly)
+            if status != 0 {
+                await shutdownMCP()
+                exit(status)
+            }
+        }
+
+    case .countTokens:
+        guard !prompt.isEmpty || parsed.systemPrompt != nil else {
+            printError("no prompt or file content provided")
+            await shutdownMCP()
             exit(exitUsageError)
         }
-        try await singlePrompt(prompt, systemPrompt: parsed.systemPrompt, stream: false, options: sessionOpts, mcpManager: mcpManager)
+        let report = try await countTokens(
+            mergedPrompt: prompt,
+            positionalPrompt: parsed.prompt,
+            pipedContent: pipedContent,
+            fileAttachments: parsed.fileAttachments,
+            systemPrompt: parsed.systemPrompt,
+            options: sessionOpts,
+            mcpManager: mcpManager
+        )
+        if parsed.strictCount && !report.fits {
+            await shutdownMCP()
+            exit(exitContextOverflow)
+        }
 
-    case .help, .version, .release, .demos:
+    case .help, .version, .release, .demos, .completions:
         break   // Already handled above; exhaustive switch.
     }
 } catch {
     let classified = reclassifyForBackend(ApfelError.classify(error, wasPCCRequest: sessionOpts.backend == .privateCloudCompute), backend: sessionOpts.backend)
     printError("\(classified.cliLabel) \(classified.openAIMessage)")
+    await shutdownMCP()
     exit(exitCode(for: classified))
 }
+
+// Normal completion: await MCP shutdown before the process exits (#246).
+await shutdownMCP()

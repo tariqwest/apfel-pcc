@@ -31,6 +31,25 @@ if ! grep -qE '^## \[Unreleased\]' "$file"; then
   exit 1
 fi
 
+# The [Unreleased] section must have real content before we stamp it as a
+# version - stamping an empty section ships a release under a blank heading
+# (this happened for v1.6.1, backfilled afterward). A "content line" is any
+# non-blank line inside the section that is not a "### Subheading" (bare
+# Added/Fixed/Changed headings with no bullets are not content). See #263.
+content=$(awk '
+  /^## \[Unreleased\]/ { insection = 1; next }
+  insection && /^## / { exit }
+  insection {
+    if ($0 ~ /^[[:space:]]*$/) next
+    if ($0 ~ /^### /) next
+    print
+  }
+' "$file")
+if [ -z "$content" ]; then
+  echo "stamp-changelog: '## [Unreleased]' section in $file is empty - add an entry (Added/Fixed/Changed) before releasing (#263)" >&2
+  exit 1
+fi
+
 tmp=$(mktemp)
 awk -v ver="$version" -v dt="$date" '
   /^## \[Unreleased\]/ && !done {

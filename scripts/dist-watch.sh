@@ -167,13 +167,11 @@ brew bump-formula-pr apfel-plus \\
   --url=https://github.com/Arthur-Ficial/apfel/releases/download/v${canonical}/apfel-${canonical}-arm64-macos.tar.gz
 \`\`\`
 
-**nixpkgs:** \`make release\` opens a \`NixOS/nixpkgs\` PR automatically as its final step (\`scripts/publish-nixpkgs-bump.sh\`). If the channel is lagging anyway, the local bump didn't fire. Re-run on demand:
+**nixpkgs (\`apfel-llm\`):** darwin-only, so \`r-ryantm\` can NEVER auto-bump it and the merge bot will not accept our self-opened PR - a committer has to merge it (days to weeks; that wait is normal, not a bug). \`make release\` plus a twice-daily launchd job (\`scripts/nixpkgs-bump-cron.sh\`) already open/advance one build-verified PR and email Franz if that fails. If nixpkgs lags with no open PR, the local bump is failing - check \`~/Library/Logs/apfel-nixpkgs-bump.log\` (most common cause: the GitHub 2FA-compliance block, i.e. an SMS factor on the account; remove it). Re-run on demand:
 
 \`\`\`bash
 ./scripts/publish-nixpkgs-bump.sh --version ${canonical}
 \`\`\`
-
-\`r-ryantm\` is the safety net (~weekly) if you don't.
 
 ## What I did NOT do
 

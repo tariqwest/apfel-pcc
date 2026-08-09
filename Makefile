@@ -215,16 +215,20 @@ test: build
 		curl -sf http://localhost:11435/health >/dev/null 2>&1 && \
 		READY=1 && break; sleep 1; done; \
 	if [ "$$READY" -ne 1 ]; then echo "FATAL: servers did not start"; exit 1; fi; \
-	python3 -m pytest Tests/integration/ -v --tb=short; \
+	XDIST_ARGS=""; python3 -c "import xdist" 2>/dev/null && XDIST_ARGS="-n auto --dist loadfile"; \
+	APFEL_REQUIRE_FULL=1 python3 -m pytest Tests/integration/ -m "not model and not serial" $$XDIST_ARGS -v --tb=short && \
+	APFEL_REQUIRE_FULL=1 python3 -m pytest Tests/integration/ -m "model or serial" -v --tb=short; \
 	STATUS=$$?; \
 	kill $$(cat /tmp/apfel-plus-test-server.pid) $$(cat /tmp/apfel-plus-test-mcp.pid) 2>/dev/null || true; \
 	rm -f /tmp/apfel-plus-test-server.pid /tmp/apfel-plus-test-mcp.pid; \
 	exit $$STATUS
 
 # --- Pre-release qualification ---
+# Light by default (#374): the model phase runs inside `make release` against
+# the stamped binary. FULL=1 also runs the model phase here (old behavior).
 
 preflight:
-	@scripts/release-preflight.sh
+	@scripts/release-preflight.sh $(if $(FULL),--full,)
 
 # --- Utilities ---
 
@@ -281,7 +285,12 @@ package-release-asset:
 	fi; \
 	rm -rf .build/release/demo; \
 	cp -R demo .build/release/demo; \
-	tar -C .build/release -czf "$$asset" $(BINARY) $(BINARY).1 demo; \
+	rm -rf .build/release/completions; \
+	mkdir -p .build/release/completions; \
+	.build/release/$(BINARY) completions bash > .build/release/completions/apfel.bash; \
+	.build/release/$(BINARY) completions zsh > .build/release/completions/apfel.zsh; \
+	.build/release/$(BINARY) completions fish > .build/release/completions/apfel.fish; \
+	tar -C .build/release -czf "$$asset" $(BINARY) $(BINARY).1 demo completions; \
 	echo "$$asset"
 
 print-release-asset:

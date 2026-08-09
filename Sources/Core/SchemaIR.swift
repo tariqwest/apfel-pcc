@@ -17,8 +17,10 @@ public indirect enum SchemaIR: Equatable, Hashable, Sendable {
     case object(name: String, description: String?, properties: [Property])
     /// A string schema, optionally constrained to an enum of allowed values.
     case string(name: String, description: String?, enumValues: [String]?)
-    /// A numeric schema. Covers both JSON Schema `integer` and `number`.
-    case number(name: String, description: String?)   // covers integer + number
+    /// A JSON Schema `integer` (whole numbers). Maps to `Int`.
+    case integer(name: String, description: String?)
+    /// A JSON Schema `number` (may be fractional). Maps to `Double`.
+    case number(name: String, description: String?)
     /// A Boolean schema.
     case bool(name: String, description: String?)
     /// An array schema whose items are described by another schema node.

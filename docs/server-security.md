@@ -1,6 +1,10 @@
 # Server Security
 
+<<<<<<< HEAD
 apfel-plus's HTTP server (`--serve`) runs on localhost by default and is designed for local development and on-device inference. This document explains the security settings and how to configure them for your specific use case.
+=======
+apfel's HTTP server (`--serve`) runs on localhost by default and is designed for local development and on-device inference. This document explains the security settings and how to configure them.
+>>>>>>> upstream/main
 
 ## How it works
 
@@ -305,7 +309,7 @@ The `--token` flag overrides `APFEL_TOKEN`. The `--token-auto` flag overrides bo
 
 ### `--footgun` - Disable all protections
 
-The shooting-yourself-in-the-foot-at-some-point-in-the-future option. Combines `--no-origin-check` and `--cors` to disable all security.
+Combines `--no-origin-check` and `--cors` to disable all security. The name is a warning: it is easy to leave enabled and regret later.
 
 ```bash
 apfel-plus --serve --footgun
@@ -437,6 +441,8 @@ apfel-plus --serve --host 0.0.0.0 --token-auto
 # Share the printed token with people on your network
 ```
 
+Binding a non-loopback host (`--host 0.0.0.0` or any LAN address) with **no** token starts the server with zero authentication - every host that can reach the socket can call the inference endpoints. apfel prints a loud red startup warning in that case and points you here; it does not refuse to bind, so always add `--token` or `--token-auto` before exposing the server.
+
 Other machines connect with:
 
 ```bash
@@ -470,6 +476,20 @@ This gives you: origin restricted to one specific app + token auth required + CO
 apfel-plus --serve --footgun
 # WARNING banner printed - you know what you're doing
 ```
+
+---
+
+## Local MCP subprocesses run with a scrubbed environment
+
+When you attach a local MCP tool script (`--mcp ./tool.py` or `--mcp ./tool`), apfel spawns it as a child process with an explicit, minimal environment rather than handing it the parent shell's full environment. This keeps a third-party tool script from reading apfel's own bearer token (`APFEL_TOKEN`, `APFEL_MCP_TOKEN`) or any cloud/API keys that happen to be exported in your shell.
+
+The child receives only an allowlist:
+
+- `PATH`, `HOME`, `TMPDIR`, `LANG`
+- `LC_*` (locale)
+- `PYTHON*` (e.g. `PYTHONPATH`, `PYTHONHOME`) and `VIRTUAL_ENV` - what typical `python3`/FastMCP/venv servers need
+
+Everything else is dropped. In particular, any variable named `APFEL_*`, or any variable whose name contains `TOKEN`, `KEY`, or `SECRET`, is always excluded even if it would otherwise match. If your MCP script needs a specific secret, pass it in the script itself or via a wrapper - do not rely on it inheriting one from apfel's environment. Remote MCP servers (`--mcp https://...`) are unaffected; this applies only to locally spawned subprocesses.
 
 ---
 

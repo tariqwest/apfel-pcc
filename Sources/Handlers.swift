@@ -16,6 +16,15 @@ struct ChatRequestTrace: Sendable {
     let requestBody: String?
     let responseBody: String?
     let events: [String]
+    /// True only when the response body is a live AsyncStream whose
+    /// onTermination handler releases the concurrency permit and the
+    /// active_requests count itself (streamingResponse /
+    /// structuredStreamingResponse). Every other response - including
+    /// buffered SSE bodies and early stream failures - must be cleaned up
+    /// by the route handler in Server.swift. Keying cleanup on `stream`
+    /// instead of this flag leaked one permit per early-failing streaming
+    /// request (#213).
+    var ownsCleanup: Bool = false
 }
 
 func capturedRequestBody(_ body: ByteBuffer, debugEnabled: Bool) -> String? {
@@ -29,8 +38,26 @@ func capturedRequestBody(_ body: ByteBuffer, debugEnabled: Bool) -> String? {
 func handleChatCompletion(_ request: Request, context: some RequestContext) async throws -> (response: Response, trace: ChatRequestTrace) {
     var events: [String] = []
 
-    // Decode request body
-    let body = try await request.body.collect(upTo: BodyLimits.maxRequestBodyBytes)
+    // Decode request body. Collecting over the 1 MiB cap throws; if it
+    // propagates out of the handler it bypasses SecurityMiddleware's CORS
+    // headers and the request log (the route handler only logs returned
+    // responses). Catch it here so a too-large body returns a proper 413
+    // with an OpenAI error object, CORS headers, and a log entry (#234).
+    let body: ByteBuffer
+    do {
+        body = try await request.body.collect(upTo: BodyLimits.maxRequestBodyBytes)
+    } catch {
+        let mib = BodyLimits.maxRequestBodyBytes / (1024 * 1024)
+        return chatFailure(
+            status: .init(code: 413),
+            message: "Request body exceeds the \(mib) MiB limit.",
+            type: "invalid_request_error",
+            stream: false,
+            requestBody: nil,
+            events: events,
+            event: "request body too large (limit \(BodyLimits.maxRequestBodyBytes) bytes)"
+        )
+    }
     let requestBodyString = capturedRequestBody(body, debugEnabled: serverState.config.debug)
     events.append("request bytes=\(body.readableBytes)")
 
@@ -56,13 +83,15 @@ func handleChatCompletion(_ request: Request, context: some RequestContext) asyn
 
     if let failure = ChatRequestValidator.validate(chatRequest) {
         return chatFailure(
-            status: .badRequest,
+            status: .init(code: failure.httpStatusCode),
             message: failure.message,
             type: "invalid_request_error",
             stream: isStreaming,
             requestBody: requestBodyString,
             events: events,
-            event: failure.event
+            event: failure.event,
+            code: failure.errorCode,
+            param: failure.errorParam
         )
     }
 
@@ -227,8 +256,13 @@ func handleChatCompletion(_ request: Request, context: some RequestContext) asyn
         let result = streamingResponse(session: session, prompt: finalPrompt,
                                        id: requestId, created: created,
                                        genOpts: genOpts, promptTokens: promptTokens,
+<<<<<<< HEAD
                                        includeUsage: includeUsage,
                                        backend: backend,
+=======
+                                       includeUsage: includeUsage, jsonMode: jsonMode,
+                                       hasTools: !(chatRequest.tools?.isEmpty ?? true),
+>>>>>>> upstream/main
                                        requestBody: requestBodyString, events: events)
         return (result.response, result.trace)
     } else {
@@ -341,12 +375,13 @@ private func mcpAutoExecuteResponse(
     if streaming {
         // SSE event order: role -> content -> stop [-> usage when opted in] -> [DONE]
         var chunks: [String] = [
-            sseDataLine(sseRoleChunk(id: id, created: created)),
-            sseDataLine(sseContentChunk(id: id, created: created, content: deliveredContent)),
+            sseDataLine(sseRoleChunk(id: id, created: created, includeUsage: includeUsage)),
+            sseDataLine(sseContentChunk(id: id, created: created, content: deliveredContent, includeUsage: includeUsage)),
             sseDataLine(ChatCompletionChunk(
                 id: id, object: "chat.completion.chunk", created: created, model: modelName,
                 choices: [.init(index: 0, delta: .init(role: nil, content: nil, tool_calls: nil), finish_reason: finishReason, logprobs: nil)],
-                usage: nil
+                usage: nil,
+                includeUsageNull: includeUsage
             )),
         ]
         if includeUsage {
@@ -354,10 +389,7 @@ private func mcpAutoExecuteResponse(
         }
         chunks.append(sseDone)
         let body = chunks.joined()
-        var headers = HTTPFields()
-        headers[.contentType] = "text/event-stream"
-        headers[.cacheControl] = "no-cache"
-        headers[.init("Connection")!] = "keep-alive"
+        let headers = eventStreamHeaders()
         let response = Response(status: .ok, headers: headers,
                                  body: .init(byteBuffer: ByteBuffer(string: body)))
         return (
@@ -383,10 +415,7 @@ private func mcpAutoExecuteResponse(
                          total_tokens: promptTokens + completionTokens)
         )
         let body = jsonString(payload)
-        var headers = HTTPFields()
-        headers[.contentType] = "application/json"
-        let response = Response(status: .ok, headers: headers,
-                                 body: .init(byteBuffer: ByteBuffer(string: body)))
+        let response = jsonResponse(body)
         return (
             response,
             ChatRequestTrace(
@@ -475,10 +504,7 @@ private func nonStreamingResponse(
     )
 
     let body = jsonString(payload)
-    var headers = HTTPFields()
-    headers[.contentType] = "application/json"
-    let response = Response(status: .ok, headers: headers,
-                             body: .init(byteBuffer: ByteBuffer(string: body)))
+    let response = jsonResponse(body)
     return (
         response,
         ChatRequestTrace(
@@ -502,14 +528,16 @@ private func streamingResponse(
     genOpts: GenerationOptions,
     promptTokens: Int,
     includeUsage: Bool,
+<<<<<<< HEAD
     backend: ModelBackend,
+=======
+    jsonMode: Bool,
+    hasTools: Bool,
+>>>>>>> upstream/main
     requestBody: String?,
     events: [String]
 ) -> (response: Response, trace: ChatRequestTrace) {
-    var headers = HTTPFields()
-    headers[.contentType] = "text/event-stream"
-    headers[.cacheControl] = "no-cache"
-    headers[.init("Connection")!] = "keep-alive"
+    let headers = eventStreamHeaders()
     let eventBox = TraceBuffer(events: events + ["stream start"])
     let cleanup = StreamCleanup()
     let taskBox = StreamTaskBox()
@@ -535,7 +563,7 @@ private func streamingResponse(
             }
 
             // Role announcement chunk
-            let roleLine = sseDataLine(sseRoleChunk(id: id, created: created))
+            let roleLine = sseDataLine(sseRoleChunk(id: id, created: created, includeUsage: includeUsage))
             responseLines?.append(roleLine.trimmingCharacters(in: .whitespacesAndNewlines))
             continuation.yield(ByteBuffer(string: roleLine))
             await eventBox.append("sent role chunk")
@@ -543,25 +571,69 @@ private func streamingResponse(
             let stream = session.streamResponse(to: prompt, options: genOpts)
             var prev = ""
             var chunkCount = 0
+            // Chars already streamed as content deltas. Tracked explicitly (not
+            // via prev.count) because the tool-call gate may buffer some prefix
+            // before flushing (#224).
+            var emittedContentCount = 0
+            // While tools are in play, hold back content that could still be a
+            // tool call so we never leak raw tool-call JSON as content (#224).
+            var toolGateHolding = hasTools
 
             do {
                 for try await snapshot in stream {
                     let content = snapshot.content
-                    if content.count > prev.count {
-                        let idx = content.index(content.startIndex, offsetBy: prev.count)
-                        let delta = String(content[idx...])
-                        let chunkLine = sseDataLine(sseContentChunk(id: id, created: created, content: delta))
-                        responseLines?.append(chunkLine.trimmingCharacters(in: .whitespacesAndNewlines))
-                        continuation.yield(ByteBuffer(string: chunkLine))
-                        chunkCount += 1
-                        await eventBox.append("chunk #\(chunkCount) delta=\(delta.count) total=\(content.count)")
-                    }
+                    guard content.count > prev.count else { prev = content; continue }
                     prev = content
+
+                    // In json_object mode we cannot fence-strip an incremental
+                    // suffix (the closing ``` only arrives at the end), so we
+                    // buffer the whole response and emit one stripped delta after
+                    // the loop (#223), mirroring the structured path.
+                    if jsonMode { continue }
+
+                    if toolGateHolding {
+                        // Keep buffering while the accumulated content could still
+                        // become a tool call. Once it diverges, flush everything so
+                        // far and resume normal streaming (#224).
+                        if StreamingToolCallGate.isPlausibleToolCallPrefix(content) { continue }
+                        toolGateHolding = false
+                    }
+
+                    let idx = content.index(content.startIndex, offsetBy: emittedContentCount)
+                    let delta = String(content[idx...])
+                    let chunkLine = sseDataLine(sseContentChunk(id: id, created: created, content: delta, includeUsage: includeUsage))
+                    responseLines?.append(chunkLine.trimmingCharacters(in: .whitespacesAndNewlines))
+                    continuation.yield(ByteBuffer(string: chunkLine))
+                    emittedContentCount = content.count
+                    chunkCount += 1
+                    await eventBox.append("chunk #\(chunkCount) delta=\(delta.count) total=\(content.count)")
                 }
 
                 // Check accumulated response for tool calls before emitting final chunk
                 let toolCalls = ToolCallHandler.detectToolCall(in: prev)
-                completionTokens = await TokenCounter.shared.count(prev)
+
+                // Deliver any content buffered but not yet streamed:
+                //  - json_object mode buffered the whole response; emit it once,
+                //    fence-stripped, so the concatenation is valid JSON (#223).
+                //  - the tool-call gate held a response that turned out NOT to be
+                //    a tool call; flush it as content now (#224).
+                // Skip entirely when the buffered output IS a tool call (handled
+                // by the tool_calls branch below).
+                let deliveredContent: String
+                if toolCalls == nil, jsonMode || emittedContentCount < prev.count {
+                    deliveredContent = jsonMode
+                        ? JSONFenceStripper.strip(prev)
+                        : String(prev[prev.index(prev.startIndex, offsetBy: emittedContentCount)...])
+                    if !deliveredContent.isEmpty {
+                        let contentLine = sseDataLine(sseContentChunk(id: id, created: created, content: deliveredContent, includeUsage: includeUsage))
+                        responseLines?.append(contentLine.trimmingCharacters(in: .whitespacesAndNewlines))
+                        continuation.yield(ByteBuffer(string: contentLine))
+                        await eventBox.append("buffered content delta chars=\(deliveredContent.count)")
+                    }
+                } else {
+                    deliveredContent = prev
+                }
+                completionTokens = await TokenCounter.shared.count(deliveredContent)
                 let resolved = FinishReasonResolver.resolve(
                     hasToolCalls: toolCalls != nil,
                     completionTokens: completionTokens,
@@ -581,25 +653,40 @@ private func streamingResponse(
                             function: call.function
                         )
                     }
+                    // OpenAI parity (#224): the tool_calls arrive in their own
+                    // chunk with finish_reason=null, then a SEPARATE empty-delta
+                    // chunk carries finish_reason. Never bundle the two.
                     let toolChunk = ChatCompletionChunk(
                         id: id, object: "chat.completion.chunk", created: created, model: modelName,
                         choices: [.init(
                             index: 0,
                             delta: .init(role: nil, content: nil, tool_calls: chunkToolCalls),
-                            finish_reason: finishReason,
+                            finish_reason: nil,
                             logprobs: nil
                         )],
-                        usage: nil
+                        usage: nil,
+                        includeUsageNull: includeUsage
                     )
                     let toolLine = sseDataLine(toolChunk)
                     responseLines?.append(toolLine.trimmingCharacters(in: .whitespacesAndNewlines))
                     continuation.yield(ByteBuffer(string: toolLine))
+
+                    let toolFinishChunk = ChatCompletionChunk(
+                        id: id, object: "chat.completion.chunk", created: created, model: modelName,
+                        choices: [.init(index: 0, delta: .init(role: nil, content: nil, tool_calls: nil), finish_reason: finishReason, logprobs: nil)],
+                        usage: nil,
+                        includeUsageNull: includeUsage
+                    )
+                    let toolFinishLine = sseDataLine(toolFinishChunk)
+                    responseLines?.append(toolFinishLine.trimmingCharacters(in: .whitespacesAndNewlines))
+                    continuation.yield(ByteBuffer(string: toolFinishLine))
                     await eventBox.append("tool_calls detected: \(calls.map(\.name).joined(separator: ", "))")
                 } else {
                     let stopChunk = ChatCompletionChunk(
                         id: id, object: "chat.completion.chunk", created: created, model: modelName,
                         choices: [.init(index: 0, delta: .init(role: nil, content: nil, tool_calls: nil), finish_reason: finishReason, logprobs: nil)],
-                        usage: nil
+                        usage: nil,
+                        includeUsageNull: includeUsage
                     )
                     let stopLine = sseDataLine(stopChunk)
                     responseLines?.append(stopLine.trimmingCharacters(in: .whitespacesAndNewlines))
@@ -636,7 +723,8 @@ private func streamingResponse(
                             finish_reason: FinishReason.length.openAIValue,
                             logprobs: nil
                         )],
-                        usage: nil
+                        usage: nil,
+                        includeUsageNull: includeUsage
                     )
                     let lengthLine = sseDataLine(lengthChunk)
                     responseLines?.append(lengthLine.trimmingCharacters(in: .whitespacesAndNewlines))
@@ -658,11 +746,11 @@ private func streamingResponse(
                 } else if case .refusal(let explanation) = classified {
                     // OpenAI wire format: stream a refusal delta, then a final
                     // chunk with finish_reason=content_filter, then [DONE].
-                    let refusalLine = sseDataLine(sseRefusalChunk(id: id, created: created, refusal: explanation))
+                    let refusalLine = sseDataLine(sseRefusalChunk(id: id, created: created, refusal: explanation, includeUsage: includeUsage))
                     responseLines?.append(refusalLine.trimmingCharacters(in: .whitespacesAndNewlines))
                     continuation.yield(ByteBuffer(string: refusalLine))
 
-                    let finishLine = sseDataLine(sseContentFilterFinishChunk(id: id, created: created))
+                    let finishLine = sseDataLine(sseContentFilterFinishChunk(id: id, created: created, includeUsage: includeUsage))
                     responseLines?.append(finishLine.trimmingCharacters(in: .whitespacesAndNewlines))
                     continuation.yield(ByteBuffer(string: finishLine))
 
@@ -739,7 +827,8 @@ private func streamingResponse(
             responseBody: serverState.config.debug
                 ? "Streaming response in progress. See /v1/chat/completions/stream log for final SSE transcript."
                 : nil,
-            events: events + ["stream request accepted", "final stream completion logged separately"]
+            events: events + ["stream request accepted", "final stream completion logged separately"],
+            ownsCleanup: true
         )
     )
 }
@@ -803,10 +892,7 @@ private func structuredNonStreamingResponse(
                      total_tokens: promptTokens + completionTokens)
     )
     let body = jsonString(payload)
-    var headers = HTTPFields()
-    headers[.contentType] = "application/json"
-    let response = Response(status: .ok, headers: headers,
-                             body: .init(byteBuffer: ByteBuffer(string: body)))
+    let response = jsonResponse(body)
     return (
         response,
         ChatRequestTrace(
@@ -836,10 +922,7 @@ private func structuredStreamingResponse(
     requestBody: String?,
     events: [String]
 ) -> (response: Response, trace: ChatRequestTrace) {
-    var headers = HTTPFields()
-    headers[.contentType] = "text/event-stream"
-    headers[.cacheControl] = "no-cache"
-    headers[.init("Connection")!] = "keep-alive"
+    let headers = eventStreamHeaders()
     let eventBox = TraceBuffer(events: events + ["structured stream start"])
     let cleanup = StreamCleanup()
     let taskBox = StreamTaskBox()
@@ -864,7 +947,7 @@ private func structuredStreamingResponse(
                 }
             }
 
-            let roleLine = sseDataLine(sseRoleChunk(id: id, created: created))
+            let roleLine = sseDataLine(sseRoleChunk(id: id, created: created, includeUsage: includeUsage))
             responseLines?.append(roleLine.trimmingCharacters(in: .whitespacesAndNewlines))
             continuation.yield(ByteBuffer(string: roleLine))
             await eventBox.append("sent role chunk")
@@ -884,7 +967,7 @@ private func structuredStreamingResponse(
                     prev = snapshot.content.jsonString
                 }
 
-                let contentLine = sseDataLine(sseContentChunk(id: id, created: created, content: prev))
+                let contentLine = sseDataLine(sseContentChunk(id: id, created: created, content: prev, includeUsage: includeUsage))
                 responseLines?.append(contentLine.trimmingCharacters(in: .whitespacesAndNewlines))
                 continuation.yield(ByteBuffer(string: contentLine))
                 await eventBox.append("structured content delta chars=\(prev.count)")
@@ -894,7 +977,8 @@ private func structuredStreamingResponse(
                 let stopChunk = ChatCompletionChunk(
                     id: id, object: "chat.completion.chunk", created: created, model: modelName,
                     choices: [.init(index: 0, delta: .init(role: nil, content: nil, tool_calls: nil), finish_reason: finishReason, logprobs: nil)],
-                    usage: nil
+                    usage: nil,
+                    includeUsageNull: includeUsage
                 )
                 let stopLine = sseDataLine(stopChunk)
                 responseLines?.append(stopLine.trimmingCharacters(in: .whitespacesAndNewlines))
@@ -916,11 +1000,11 @@ private func structuredStreamingResponse(
             } catch {
                 let classified = reclassifyForBackend(ApfelError.classify(error), backend: backend)
                 if case .refusal(let explanation) = classified {
-                    let refusalLine = sseDataLine(sseRefusalChunk(id: id, created: created, refusal: explanation))
+                    let refusalLine = sseDataLine(sseRefusalChunk(id: id, created: created, refusal: explanation, includeUsage: includeUsage))
                     responseLines?.append(refusalLine.trimmingCharacters(in: .whitespacesAndNewlines))
                     continuation.yield(ByteBuffer(string: refusalLine))
 
-                    let finishLine = sseDataLine(sseContentFilterFinishChunk(id: id, created: created))
+                    let finishLine = sseDataLine(sseContentFilterFinishChunk(id: id, created: created, includeUsage: includeUsage))
                     responseLines?.append(finishLine.trimmingCharacters(in: .whitespacesAndNewlines))
                     continuation.yield(ByteBuffer(string: finishLine))
 
@@ -988,7 +1072,8 @@ private func structuredStreamingResponse(
             responseBody: serverState.config.debug
                 ? "Streaming response in progress. See /v1/chat/completions/stream log for final SSE transcript."
                 : nil,
-            events: events + ["structured stream request accepted", "final stream completion logged separately"]
+            events: events + ["structured stream request accepted", "final stream completion logged separately"],
+            ownsCleanup: true
         )
     )
 }
@@ -1000,10 +1085,12 @@ private func chatFailure(
     stream: Bool,
     requestBody: String?,
     events: [String],
-    event: String
+    event: String,
+    code: String? = nil,
+    param: String? = nil
 ) -> (response: Response, trace: ChatRequestTrace) {
     (
-        openAIError(status: status, message: message, type: type),
+        openAIError(status: status, message: message, type: type, code: code, param: param),
         ChatRequestTrace(
             stream: stream,
             estimatedTokens: nil,
@@ -1045,10 +1132,7 @@ private func refusalNonStreamingResponse(
         )
     )
     let body = jsonString(payload)
-    var headers = HTTPFields()
-    headers[.contentType] = "application/json"
-    let response = Response(status: .ok, headers: headers,
-                             body: .init(byteBuffer: ByteBuffer(string: body)))
+    let response = jsonResponse(body)
     return (
         response,
         ChatRequestTrace(
@@ -1078,9 +1162,9 @@ private func refusalStreamingResponse(
     let completionTokens = await TokenCounter.shared.count(refusal)
     let finishReason = FinishReason.contentFilter.openAIValue
     var chunks: [String] = [
-        sseDataLine(sseRoleChunk(id: id, created: created)),
-        sseDataLine(sseRefusalChunk(id: id, created: created, refusal: refusal)),
-        sseDataLine(sseContentFilterFinishChunk(id: id, created: created)),
+        sseDataLine(sseRoleChunk(id: id, created: created, includeUsage: includeUsage)),
+        sseDataLine(sseRefusalChunk(id: id, created: created, refusal: refusal, includeUsage: includeUsage)),
+        sseDataLine(sseContentFilterFinishChunk(id: id, created: created, includeUsage: includeUsage)),
     ]
     if includeUsage {
         chunks.append(sseDataLine(sseUsageChunk(
@@ -1090,10 +1174,7 @@ private func refusalStreamingResponse(
     }
     chunks.append(sseDone)
     let body = chunks.joined()
-    var headers = HTTPFields()
-    headers[.contentType] = "text/event-stream"
-    headers[.cacheControl] = "no-cache"
-    headers[.init("Connection")!] = "keep-alive"
+    let headers = eventStreamHeaders()
     let response = Response(status: .ok, headers: headers,
                              body: .init(byteBuffer: ByteBuffer(string: body)))
     return (
@@ -1112,10 +1193,7 @@ private func refusalStreamingResponse(
 // MARK: - Error Helper
 
 /// Create an OpenAI-formatted error response (with CORS headers when enabled).
-func openAIError(status: HTTPResponse.Status, message: String, type: String, code: String? = nil) -> Response {
-    let error = OpenAIErrorResponse(error: .init(message: message, type: type, param: nil, code: code))
-    let body = jsonString(error)
-    var headers = HTTPFields()
-    headers[.contentType] = "application/json"
-    return Response(status: status, headers: headers, body: .init(byteBuffer: ByteBuffer(string: body)))
+func openAIError(status: HTTPResponse.Status, message: String, type: String, code: String? = nil, param: String? = nil) -> Response {
+    let error = OpenAIErrorResponse(error: .init(message: message, type: type, param: param, code: code))
+    return jsonResponse(jsonString(error), status: status)
 }

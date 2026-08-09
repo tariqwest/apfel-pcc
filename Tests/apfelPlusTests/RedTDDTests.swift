@@ -1,12 +1,12 @@
 // ============================================================================
-// RedTDDTests.swift - TDD RED tests for the open bug tickets (#177/#178/#180/
-// #181/#183). These are DELIBERATELY FAILING. They assert the CORRECT
-// behaviour described in each GitHub issue; the fix that makes them pass is a
-// separate follow-up task. Do not "fix" the code to make these green here.
+// RedTDDTests.swift - REGRESSION GUARDS for the bug tickets #177/#178/#180/
+// #181/#183. These began as the TDD RED batch (branch tdd/red-tests-167-183);
+// every ticket is now FIXED and shipped, and these tests are kept GREEN as
+// regression guards. They assert the CORRECT behaviour described in each GitHub
+// issue - if one goes red, the corresponding fix has regressed.
 //
-// Branch: tdd/red-tests-167-183
-// Bugs in the executable target (#175/#176/#179/#182) and the feature tickets
-// (#167-#171) are red-tested at the wire/CLI boundary in
+// Bugs in the FoundationModels-coupled executable target (#175/#176/#179/#182)
+// and the feature tickets (#167-#171) are guarded at the wire/CLI boundary in
 // Tests/integration/test_tdd_red.py - they cannot be reached from this
 // pure-library test target (see Package.swift: apfel-plus-tests depends only on
 // ApfelCore + ApfelCLI).

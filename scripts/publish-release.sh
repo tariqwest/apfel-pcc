@@ -83,7 +83,18 @@ done
 
 # Run ALL integration test files — directory discovery, not explicit lists.
 # This ensures new test files are never silently excluded from release qualification.
-python3 -m pytest Tests/integration/ -v --tb=short
+# APFEL_REQUIRE_FULL=1: any skipped test fails the release (#227) - a skip means a
+# feature shipped unverified (the exact green-by-skip hole this closes).
+# Two phases (#374): the model-free/parallel-safe partition first (cheap gates
+# fail before any model time is spent; parallel when pytest-xdist is present),
+# then the serial model phase. The marker expressions are complements: every
+# test runs exactly once, all against the stamped release binary.
+XDIST_ARGS=""
+if python3 -c "import xdist" 2>/dev/null; then
+    XDIST_ARGS="-n auto --dist loadfile"
+fi
+APFEL_REQUIRE_FULL=1 python3 -m pytest Tests/integration/ -m "not model and not serial" $XDIST_ARGS -v --tb=short
+APFEL_REQUIRE_FULL=1 python3 -m pytest Tests/integration/ -m "model or serial" -v --tb=short
 
 # Stop servers
 kill "$SERVER_PID" "$MCP_SERVER_PID" 2>/dev/null || true
@@ -92,6 +103,57 @@ SERVER_PID=""
 MCP_SERVER_PID=""
 trap - EXIT
 
+# --- Sign the binary (#226) ---
+# Signing and notarization run BEFORE the release commit/tag is pushed: they
+# only need the built binary, and a signing/notarization failure must abort
+# with zero published side effects (no stranded tag, no double version bump).
+# Sign with the Developer ID identity under a hardened runtime BEFORE packaging
+# so the tarred binary is the signed one. Signing lives here (not in
+# package-release-asset) so plain `make build`/dev packaging never touches the
+# keychain. On the release path signing is mandatory - a real release must not
+# ship an ad-hoc binary.
+step "Sign release binary"
+security find-identity -v -p codesigning 2>/dev/null | grep -q "Developer ID Application: Franz Enzenhofer (7D2YX5DQ6M)" \
+    || fail "no 'Developer ID Application: Franz Enzenhofer (7D2YX5DQ6M)' signing identity found - cannot publish a signed release (#226)"
+codesign --force --timestamp --options runtime \
+    --sign "Developer ID Application: Franz Enzenhofer (7D2YX5DQ6M)" \
+    ".build/release/apfel" \
+    || fail "codesign failed - refusing to publish (#226)"
+codesign --verify --strict ".build/release/apfel" || fail "codesign verification failed (#226)"
+
+# --- Notarization hard gate (#226) ---
+# Refuse to publish an ad-hoc-signed binary, and notarize the signed binary so
+# Gatekeeper accepts non-brew downloads. A bare CLI binary cannot be stapled
+# (stapler needs a bundle/dmg/pkg), so we notarize the submission and ship
+# without a stapled ticket - Gatekeeper verifies notarization online.
+sig=$(codesign -dvv ".build/release/apfel" 2>&1 || true)
+echo "$sig" | grep -q "TeamIdentifier=7D2YX5DQ6M" || \
+    fail "release binary is not Developer ID signed (need TeamIdentifier 7D2YX5DQ6M) - refusing to publish an ad-hoc release (#226)"
+echo "$sig" | grep -q "flags=.*runtime" || \
+    fail "release binary is not signed with the hardened runtime - notarization will reject it (#226)"
+
+notarize_dir=$(mktemp -d)
+mkdir -p "$notarize_dir/payload"
+cp ".build/release/apfel" "$notarize_dir/payload/apfel"
+COPYFILE_DISABLE=1 ditto -c -k "$notarize_dir/payload" "$notarize_dir/apfel-notarize.zip"
+# Credentials: prefer explicit App Store Connect creds (works non-interactively,
+# e.g. when the notarytool keychain profile lives in a locked keychain), else
+# fall back to the documented "notarytool" keychain profile (see
+# ~/dev/apple-dev-id/README.md). team-id defaults to Franz's team.
+if [ -n "${APFEL_NOTARY_APPLE_ID:-}" ] && [ -n "${APFEL_NOTARY_PASSWORD:-}" ]; then
+    xcrun notarytool submit "$notarize_dir/apfel-notarize.zip" \
+        --apple-id "$APFEL_NOTARY_APPLE_ID" \
+        --team-id "${APFEL_NOTARY_TEAM_ID:-7D2YX5DQ6M}" \
+        --password "$APFEL_NOTARY_PASSWORD" --wait \
+        || { rm -rf "$notarize_dir"; fail "notarization failed - refusing to publish (#226)."; }
+else
+    NOTARY_PROFILE="${APFEL_NOTARY_PROFILE:-notarytool}"
+    xcrun notarytool submit "$notarize_dir/apfel-notarize.zip" \
+        --keychain-profile "$NOTARY_PROFILE" --wait \
+        || { rm -rf "$notarize_dir"; fail "notarization failed - refusing to publish (#226). Ensure the '$NOTARY_PROFILE' keychain profile exists (xcrun notarytool store-credentials) and its keychain is unlocked, or set APFEL_NOTARY_APPLE_ID / APFEL_NOTARY_PASSWORD."; }
+fi
+rm -rf "$notarize_dir"
+
 # --- Commit + tag + push ---
 step "Commit and tag v$version"
 
@@ -99,7 +161,14 @@ step "Commit and tag v$version"
 # stays current with every release (#201). Idempotent.
 bash scripts/stamp-changelog.sh "$version"
 
-git add .version README.md Sources/BuildInfo.swift CHANGELOG.md
+# Re-stamp the docs/EXAMPLES.md header with the version being released (#332).
+# The doc is regenerated from the *installed* binary before the bump, so its
+# stamp is otherwise permanently one version behind the tag that ships it.
+# Outputs are unaffected by a version bump, so only the header line changes;
+# the macOS/chip/date parts of the stamp are preserved. Idempotent.
+sed -i '' -E "1,10s/^> apfel v[0-9]+\.[0-9]+\.[0-9]+ \|/> apfel v$version |/" docs/EXAMPLES.md
+
+git add .version README.md Sources/BuildInfo.swift CHANGELOG.md docs/EXAMPLES.md
 git commit -m "release v$version"
 git tag -a "v$version" -m "v$version"
 git push origin HEAD:main
@@ -109,11 +178,16 @@ git push origin "v$version"
 step "Publish GitHub Release"
 
 asset=$(make package-release-asset | tail -1)
-sha256=$(shasum -a 256 "$asset" | awk '{print $1}')
+
+# Checksum sidecar, published as a second release asset so a swapped tarball is
+# detectable independently of the Homebrew formula (#226).
+shasum -a 256 "$asset" > "$asset.sha256"
+sha256=$(awk '{print $1}' "$asset.sha256")
 echo "Asset: $asset"
 echo "SHA256: $sha256"
+echo "Checksum asset: $asset.sha256"
 
-prev_tag=$(git tag --sort=-v:refname | grep -v "v$version" | head -1)
+prev_tag=$(git tag --sort=-v:refname | grep -Fxv "v$version" | head -1)
 notes="## What's Changed"$'\n\n'
 if [ -n "$prev_tag" ]; then
     notes+=$(git log --oneline "$prev_tag"..HEAD~1 -- | sed 's/^/- /')
@@ -123,9 +197,9 @@ notes+="Install: \`brew install apfel-plus\`"$'\n'
 notes+="Upgrade: \`brew upgrade apfel-plus\`"
 
 if gh release view "v$version" --repo Arthur-Ficial/apfel >/dev/null 2>&1; then
-    gh release upload "v$version" "$asset" --clobber --repo Arthur-Ficial/apfel
+    gh release upload "v$version" "$asset" "$asset.sha256" --clobber --repo Arthur-Ficial/apfel
 else
-    gh release create "v$version" "$asset" \
+    gh release create "v$version" "$asset" "$asset.sha256" \
         --title "v$version" \
         --notes "$notes" \
         --repo Arthur-Ficial/apfel

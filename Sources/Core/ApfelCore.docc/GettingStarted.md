@@ -50,4 +50,4 @@ if let failure = ChatRequestValidator.validate(request) {
 }
 ```
 
-See the executable examples in [Examples](../../../../Examples) for small runnable entry points.
+See the executable examples in [Examples](../../../Examples) for small runnable entry points.

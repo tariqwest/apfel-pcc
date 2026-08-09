@@ -153,4 +153,44 @@ func runOriginValidatorTests() {
     test("Bearer with empty value rejected") {
         try assertTrue(!OriginValidator.isValidToken(provided: "Bearer ", expected: "secret123"))
     }
+
+    // MARK: - constantTimeEquals (#231)
+
+    test("constantTimeEquals: equal strings match") {
+        try assertTrue(OriginValidator.constantTimeEquals("secret123", "secret123"))
+    }
+
+    test("constantTimeEquals: different strings of same length differ") {
+        try assertTrue(!OriginValidator.constantTimeEquals("secret123", "secret124"))
+    }
+
+    test("constantTimeEquals: shared prefix, differing suffix differ") {
+        try assertTrue(!OriginValidator.constantTimeEquals("aaaaaaaaaa", "aaaaaaaaab"))
+    }
+
+    test("constantTimeEquals: differing lengths differ (no early return)") {
+        try assertTrue(!OriginValidator.constantTimeEquals("secret", "secret123"))
+        try assertTrue(!OriginValidator.constantTimeEquals("secret123", "secret"))
+    }
+
+    test("constantTimeEquals: shared-prefix differing lengths differ") {
+        try assertTrue(!OriginValidator.constantTimeEquals("abc", "abcdefghij"))
+    }
+
+    test("constantTimeEquals: both empty match") {
+        try assertTrue(OriginValidator.constantTimeEquals("", ""))
+    }
+
+    test("constantTimeEquals: empty vs non-empty differ") {
+        try assertTrue(!OriginValidator.constantTimeEquals("", "x"))
+        try assertTrue(!OriginValidator.constantTimeEquals("x", ""))
+    }
+
+    test("constantTimeEquals: multibyte UTF-8 equal match") {
+        try assertTrue(OriginValidator.constantTimeEquals("tökén-café", "tökén-café"))
+    }
+
+    test("constantTimeEquals: multibyte UTF-8 differ") {
+        try assertTrue(!OriginValidator.constantTimeEquals("tökén-café", "tökén-cafe"))
+    }
 }

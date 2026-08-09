@@ -179,6 +179,43 @@ def test_bidirectional_env_var_coverage():
     )
 
 
+def _help_environment_section(text: str) -> str:
+    """The ENVIRONMENT block of --help (between the ENVIRONMENT: and EXIT CODES: headers)."""
+    start = text.find("ENVIRONMENT:")
+    assert start >= 0, "no ENVIRONMENT: header in --help"
+    end = text.find("EXIT CODES:", start)
+    return text[start:end] if end >= 0 else text[start:]
+
+
+def _man_environment_section(text: str) -> str:
+    """The ENVIRONMENT block of the man page (between .SH ENVIRONMENT and the next .SH)."""
+    start = text.find(".SH ENVIRONMENT")
+    assert start >= 0, "no .SH ENVIRONMENT in man page"
+    next_sh = text.find(".SH ", start + len(".SH ENVIRONMENT"))
+    return text[start:next_sh] if next_sh >= 0 else text[start:]
+
+
+def test_environment_section_lists_match():
+    """The ENVIRONMENT *section* of --help and the man page must list the same vars.
+
+    The whole-text coverage check above is fooled by a var that is only named
+    in a flag description (e.g. APFEL_MCP_TOKEN in the --mcp-token line): it
+    can be absent from the ENVIRONMENT list yet still counted as present. This
+    section-scoped check catches that drift.
+    """
+    help_env = _env_vars_from(_help_environment_section(_help_output()))
+    man_env = _env_vars_from(_man_environment_section(_man_page_unescaped()))
+
+    missing_in_help = man_env - help_env
+    missing_in_man = help_env - man_env
+    assert not missing_in_help, (
+        f"Env vars in man ENVIRONMENT but missing from --help ENVIRONMENT list: {sorted(missing_in_help)}"
+    )
+    assert not missing_in_man, (
+        f"Env vars in --help ENVIRONMENT but missing from man ENVIRONMENT list: {sorted(missing_in_man)}"
+    )
+
+
 def test_bidirectional_exit_code_coverage():
     """Every exit code declared in ApfelCLI must appear in the man page."""
     # Constants live in Sources/CLI/ExitCodes.swift (testable); main.swift

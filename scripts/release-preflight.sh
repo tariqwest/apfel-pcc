@@ -1,8 +1,22 @@
 #!/usr/bin/env bash
 # Pre-release qualification for apfel.
 # Run this before `make release` to verify everything is green locally.
-# Usage: make preflight  OR  ./scripts/release-preflight.sh
+#
+# Default is the LIGHT preflight (#374): build + unit tests + the parallel
+# model-free integration phase (-m "not model and not serial") + policy
+# checks - a fast go/no-go in ~3 min. The full model suite is NOT skipped:
+# publish-release.sh runs every test against the stamped release binary, so
+# each release still executes the complete suite exactly once.
+#
+# Pass --full (or make preflight FULL=1) to also run the serial model phase
+# (-m "model or serial") here - the pre-#374 behavior, for qualifying without
+# releasing.
+#
+# Usage: make preflight  OR  ./scripts/release-preflight.sh [--full]
 set -euo pipefail
+
+FULL=0
+[ "${1:-}" = "--full" ] && FULL=1
 
 PASS=0
 FAIL=0
@@ -113,13 +127,57 @@ done
 if [ "$READY" -ne 1 ]; then
     fail "servers did not start within 15s"
 else
-    # Run ALL integration test files — directory discovery, not explicit lists.
-    # This ensures new test files are never silently excluded.
-    if python3 -m pytest Tests/integration/ -v --tb=short -x 2>&1; then
-        suite_count=$(find Tests/integration -name '*test*.py' ! -name 'conftest.py' | wc -l | tr -d ' ')
-        pass "integration tests ($suite_count suites)"
+    # Directory discovery, not explicit lists - new test files are never
+    # silently excluded. APFEL_REQUIRE_FULL=1: any skipped test fails the run
+    # (#227). Two phases (#374): the cheap model-free/parallel-safe partition
+    # first (so a doc-drift gate fails in seconds, not after 10 min of model
+    # tests), then - only with --full - the serial model phase. The two marker
+    # expressions are complements, so together they run every test exactly once.
+    XDIST_ARGS=""
+    if python3 -c "import xdist" 2>/dev/null; then
+        XDIST_ARGS="-n auto --dist loadfile"
+    fi
+    if APFEL_REQUIRE_FULL=1 python3 -m pytest Tests/integration/ -m "not model and not serial" $XDIST_ARGS -v --tb=short -x 2>&1; then
+        pass "integration tests (model-free phase)"
     else
-        fail "integration tests"
+        fail "integration tests (model-free phase)"
+    fi
+    if [ "$FULL" -eq 1 ]; then
+        if APFEL_REQUIRE_FULL=1 python3 -m pytest Tests/integration/ -m "model or serial" -v --tb=short -x 2>&1; then
+            pass "integration tests (model phase, --full)"
+        else
+            fail "integration tests (model phase, --full)"
+        fi
+    else
+        echo "(light preflight: the model phase runs inside make release; use --full to run it here)"
+    fi
+fi
+
+# --- 6b. CHANGELOG [Unreleased] discipline ---
+# If there are commits since the last tag, the [Unreleased] section must have
+# content - otherwise `make release` stamps a version under a blank heading
+# (this happened for v1.6.1). Docs/test/CI-only commits are fine; the gate only
+# fires when work has landed but nobody wrote a changelog entry. See #263.
+step "CHANGELOG [Unreleased]"
+last_tag=$(git tag --sort=-v:refname | grep -E '^v[0-9]+\.[0-9]+\.[0-9]+$' | head -1)
+if [ -z "$last_tag" ]; then
+    echo "(no version tags yet - skipping [Unreleased] content gate)"
+elif [ "$(git rev-list "$last_tag"..HEAD --count)" -eq 0 ]; then
+    pass "no commits since $last_tag - nothing to changelog"
+else
+    unreleased_content=$(awk '
+      /^## \[Unreleased\]/ { insection = 1; next }
+      insection && /^## / { exit }
+      insection {
+        if ($0 ~ /^[[:space:]]*$/) next
+        if ($0 ~ /^### /) next
+        print
+      }
+    ' CHANGELOG.md)
+    if [ -n "$unreleased_content" ]; then
+        pass "[Unreleased] has entries (commits since $last_tag)"
+    else
+        fail "$(git rev-list "$last_tag"..HEAD --count) commits since $last_tag but CHANGELOG.md [Unreleased] is empty - add an Added/Fixed/Changed entry (#263)"
     fi
 fi
 

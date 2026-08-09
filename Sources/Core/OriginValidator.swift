@@ -56,7 +56,30 @@ public enum OriginValidator {
         } else {
             token = provided
         }
-        return !token.isEmpty && token == expected
+        return !token.isEmpty && constantTimeEquals(token, expected)
+    }
+
+    /// Constant-time equality over the UTF-8 bytes of two strings.
+    ///
+    /// Swift's `String ==` short-circuits on the first differing byte, so its
+    /// runtime leaks the length of the shared prefix - a timing side channel on
+    /// bearer-token comparison (#231). This XOR-accumulates over the longer of
+    /// the two byte arrays so total work depends only on the inputs' lengths,
+    /// never on where they first differ, and folds any length mismatch into the
+    /// accumulator instead of early-returning on it.
+    public static func constantTimeEquals(_ a: String, _ b: String) -> Bool {
+        let lhs = Array(a.utf8)
+        let rhs = Array(b.utf8)
+        let maxCount = Swift.max(lhs.count, rhs.count)
+        // Seed with the length difference so mismatched lengths can never be
+        // distinguished by comparison time (no early return on length).
+        var diff: UInt8 = lhs.count == rhs.count ? 0 : 1
+        for i in 0..<maxCount {
+            let x = i < lhs.count ? lhs[i] : 0
+            let y = i < rhs.count ? rhs[i] : 0
+            diff |= x ^ y
+        }
+        return diff == 0
     }
 
     // MARK: - Private

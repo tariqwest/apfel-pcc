@@ -12,8 +12,9 @@ import ApfelCLI
 // Marked `nonisolated(unsafe)` because Swift 6 strict concurrency treats global
 // mutable state as @MainActor-isolated. Safe here: single-threaded CLI, write-once.
 
-/// True if the NO_COLOR environment variable is set (https://no-color.org)
-let noColorEnv = ProcessInfo.processInfo.environment["NO_COLOR"] != nil
+/// True if the NO_COLOR environment variable is set to a non-empty value
+/// (https://no-color.org). An empty `NO_COLOR=` must not disable color (#258).
+let noColorEnv = ColorPolicy.noColorFromEnv(ProcessInfo.processInfo.environment["NO_COLOR"])
 
 /// True if --no-color flag was passed
 nonisolated(unsafe) var noColorFlag = false
@@ -37,13 +38,26 @@ enum ANSIColor: String, Sendable {
     case red     = "\u{001B}[31m"
 }
 
-/// Apply ANSI color codes to text. Returns plain text if stdout is not a TTY,
-/// NO_COLOR is set, or --no-color was passed.
-func styled(_ text: String, _ colors: ANSIColor...) -> String {
-    let isTerminal = isatty(STDOUT_FILENO) != 0
-    guard isTerminal, !noColorEnv, !noColorFlag else { return text }
+/// Wrap `text` in ANSI codes when `colorize` is true; otherwise return it plain.
+func applyStyle(_ text: String, colorize: Bool, _ colors: [ANSIColor]) -> String {
+    guard colorize else { return text }
     let prefix = colors.map(\.rawValue).joined()
     return "\(prefix)\(text)\(ANSIColor.reset.rawValue)"
+}
+
+/// Apply ANSI color codes to text destined for stdout. Returns plain text if
+/// stdout is not a TTY, NO_COLOR is set, or --no-color was passed.
+func styled(_ text: String, _ colors: ANSIColor...) -> String {
+    applyStyle(text, colorize: ColorPolicy.shouldColorize(
+        isTTY: isatty(STDOUT_FILENO) != 0, noColorEnv: noColorEnv, noColorFlag: noColorFlag), colors)
+}
+
+/// Apply ANSI color codes to text destined for stderr. Keys colorization off
+/// stderr's own TTY-ness so redirected stderr (e.g. `apfel ... 2>err.log`) stays
+/// escape-free even when stdout is a terminal (#249).
+func styledErr(_ text: String, _ colors: ANSIColor...) -> String {
+    applyStyle(text, colorize: ColorPolicy.shouldColorize(
+        isTTY: isatty(STDERR_FILENO) != 0, noColorEnv: noColorEnv, noColorFlag: noColorFlag), colors)
 }
 
 // MARK: - Output Helpers
@@ -57,7 +71,7 @@ func printStderr(_ message: String) {
 
 /// Print a styled error message to stderr. Format: "error: <message>"
 func printError(_ message: String) {
-    stderr.write(Data("\(styled("error:", .red, .bold)) \(message)\n".utf8))
+    stderr.write(Data("\(styledErr("error:", .red, .bold)) \(message)\n".utf8))
 }
 
 // MARK: - Debug Output
@@ -65,11 +79,11 @@ func printError(_ message: String) {
 /// Print a debug message to stderr. Zero-cost when debug logging is disabled.
 func debugLog(_ message: @autoclosure () -> String) {
     guard ApfelDebugConfiguration.isEnabled else { return }
-    printStderr("\(styled("debug:", .dim)) \(message())")
+    printStderr("\(styledErr("debug:", .dim)) \(message())")
 }
 
 /// Print a categorized debug message to stderr. Zero-cost when debug logging is disabled.
 func debugLog(_ category: String, _ message: @autoclosure () -> String) {
     guard ApfelDebugConfiguration.isEnabled else { return }
-    printStderr("\(styled("debug[\(category)]:", .dim)) \(message())")
+    printStderr("\(styledErr("debug[\(category)]:", .dim)) \(message())")
 }

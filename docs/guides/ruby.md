@@ -229,7 +229,11 @@ Lab script: [`06_example.rb`](https://github.com/Arthur-Ficial/apfel-guides-lab/
 
 ## Tested with
 
+<<<<<<< HEAD
 - apfel-plus v1.0.3 / macOS 26.3.1 Apple Silicon
+=======
+- apfel v1.0.3 / macOS 26.3.1 Apple Silicon (original capture; the CLI and HTTP surfaces used here are release-gated by apfel's test suite on every version)
+>>>>>>> upstream/main
 - Ruby 2.6.10 (system) / ruby-openai 7.4.0
 - Date: 2026-04-16
 

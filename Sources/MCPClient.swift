@@ -7,7 +7,25 @@ import Foundation
 import Darwin
 import ApfelCore
 
+/// Grace period after SIGTERM before escalating to SIGKILL when reaping a local
+/// MCP child (#216).
+private let mcpShutdownGraceSeconds: TimeInterval = 2.0
+
 /// A connection to a single MCP server process (stdio transport).
+///
+/// Thread safety (justifying `@unchecked Sendable`): in `--serve` mode,
+/// `AnyMCPConnection.callTool` runs this connection's blocking stdio I/O via
+/// `Task.detached`, so concurrent requests reach one instance from multiple
+/// threads. All mutable state is confined behind locks: `nextId` is guarded by
+/// `lock` (`allocId()`), and every wire exchange - the full send+receive pair
+/// in `sendAndReceive` and standalone notification writes via `sendLocked` -
+/// is serialized by `ioLock`, so two concurrent tool calls can neither
+/// interleave stdin writes (corruption for payloads > PIPE_BUF) nor consume
+/// each other's stdout lines (cross-delivered or dropped responses, #218).
+/// `tools` is written once during `init`, before the instance is published to
+/// any other thread, and is read-only afterwards. `process`, the pipes, and
+/// `lineReader` are `let` bindings set in `init`; post-init writes to the
+/// child's stdin all go through the `ioLock`-guarded paths.
 final class MCPConnection: @unchecked Sendable {
     private let timeoutMilliseconds: Int
 
@@ -19,6 +37,8 @@ final class MCPConnection: @unchecked Sendable {
     private let stdoutPipe: Pipe
     private let lineReader: BufferedLineReader
     private let lock = NSLock()
+    /// Serializes complete wire exchanges (send+receive) per connection (#218).
+    private let ioLock = NSLock()
     private var nextId = 1
 
     init(path: String, timeoutSeconds: Int = 5) async throws {
@@ -42,6 +62,11 @@ final class MCPConnection: @unchecked Sendable {
         proc.standardInput = stdinP
         proc.standardOutput = stdoutP
         proc.standardError = FileHandle.nullDevice
+        // Scrub the child's environment so a third-party MCP script never
+        // inherits APFEL_TOKEN/APFEL_MCP_TOKEN or any cloud/API keys in the
+        // shell. With environment == nil, Process inherits the full parent env
+        // (#229). The allowlist keeps what python3/FastMCP/venv servers need.
+        proc.environment = ServerSecurity.scrubbedMCPEnvironment(from: ProcessInfo.processInfo.environment)
 
         self.process = proc
         self.stdinPipe = stdinP
@@ -53,17 +78,21 @@ final class MCPConnection: @unchecked Sendable {
 
         do {
             // Initialize handshake
+            let initId = allocId()
             let initResp = try sendAndReceive(
-                MCPProtocol.initializeRequest(id: allocId()),
+                MCPProtocol.initializeRequest(id: initId),
+                id: initId,
                 timeoutMilliseconds: timeoutMilliseconds,
                 operationDescription: "initialize"
             )
             let _ = try MCPProtocol.parseInitializeResponse(initResp)
-            send(MCPProtocol.initializedNotification())
+            try sendLocked(MCPProtocol.initializedNotification())
 
             // Discover tools
+            let listId = allocId()
             let toolsResp = try sendAndReceive(
-                MCPProtocol.toolsListRequest(id: allocId()),
+                MCPProtocol.toolsListRequest(id: listId),
+                id: listId,
                 timeoutMilliseconds: timeoutMilliseconds,
                 operationDescription: "tools/list"
             )
@@ -76,29 +105,44 @@ final class MCPConnection: @unchecked Sendable {
         }
     }
 
-    func callTool(name: String, arguments: String) throws -> String {
-        let resp: String
-        do {
-            resp = try sendAndReceive(
-                MCPProtocol.toolsCallRequest(id: allocId(), name: name, arguments: arguments),
-                timeoutMilliseconds: timeoutMilliseconds,
-                operationDescription: "tool '\(name)'"
-            )
-        } catch {
-            if case .timedOut = error as? MCPError {
-                shutdown()
-            }
-            throw error
-        }
-        let result = try MCPProtocol.parseToolCallResponse(resp)
-        if result.isError {
-            throw MCPError.serverError("Tool '\(name)' failed: \(result.text)")
-        }
-        return result.text
+    func callTool(name: String, arguments: String) throws -> MCPProtocol.ToolCallResult {
+        // Malformed model-emitted arguments must fail loudly instead of being
+        // silently replaced with {} by the request formatter (#241).
+        try MCPProtocol.validateToolArguments(name: name, arguments: arguments)
+        // On timeout the manager deregisters and reaps this connection (#216);
+        // callTool just surfaces the error.
+        let requestId = allocId()
+        let resp = try sendAndReceive(
+            MCPProtocol.toolsCallRequest(id: requestId, name: name, arguments: arguments),
+            id: requestId,
+            timeoutMilliseconds: timeoutMilliseconds,
+            operationDescription: "tool '\(name)'"
+        )
+        // An MCP-spec `isError: true` result is a tool-execution error, not a
+        // transport failure: it is returned (not thrown) so the caller can feed
+        // it back to the model to recover, per the MCP spec (#220). Only
+        // transport/protocol failures throw.
+        return try MCPProtocol.parseToolCallResponse(resp)
     }
 
+    /// Terminate the child and reap it so it never lingers as a zombie (#216).
+    /// SIGTERM first, then SIGKILL after a bounded grace period for a child that
+    /// ignores SIGTERM, then a blocking waitUntilExit() to collect the exit
+    /// status. Idempotent: safe to call on an already-exited process.
     func shutdown() {
-        process.terminate()
+        guard process.isRunning else {
+            process.waitUntilExit()
+            return
+        }
+        process.terminate() // SIGTERM
+        let deadline = Date().addingTimeInterval(mcpShutdownGraceSeconds)
+        while process.isRunning && Date() < deadline {
+            usleep(20_000) // 20 ms
+        }
+        if process.isRunning {
+            kill(process.processIdentifier, SIGKILL) // escalate
+        }
+        process.waitUntilExit() // reap - no zombie
     }
 
     deinit {
@@ -115,21 +159,72 @@ final class MCPConnection: @unchecked Sendable {
         return id
     }
 
-    private func send(_ message: String) {
+    private func send(_ message: String) throws {
         guard let data = (message + "\n").data(using: .utf8) else { return }
-        stdinPipe.fileHandleForWriting.write(data)
+        // Guard against writing to a crashed MCP server. Without this a closed
+        // read end raises SIGPIPE (fatal by default) or, with the legacy
+        // non-throwing FileHandle.write(_:), an uncatchable ObjC exception on
+        // EPIPE. The isRunning check catches the common case fast; the throwing
+        // write(contentsOf:) inside do/catch catches the crash-mid-write race
+        // and maps it to a recoverable MCPError (#215).
+        guard process.isRunning else {
+            throw MCPError.processError("MCP server process is not running (\(path))")
+        }
+        do {
+            try stdinPipe.fileHandleForWriting.write(contentsOf: data)
+        } catch {
+            throw MCPError.processError("failed to write to MCP server stdin (\(path)): \(error.localizedDescription)")
+        }
     }
 
+    /// Standalone write (notification path) serialized against in-flight
+    /// exchanges so it cannot interleave with another request's stdin bytes
+    /// (#218). Never call while holding `ioLock` - NSLock is not reentrant.
+    private func sendLocked(_ message: String) throws {
+        ioLock.lock()
+        defer { ioLock.unlock() }
+        try send(message)
+    }
+
+    /// Sends `message` and reads until the response whose JSON-RPC `"id"`
+    /// matches `id` arrives, under one shared deadline (#217). Notifications
+    /// and responses to other ids are skipped; server `ping` requests are
+    /// answered inline. Without this, a single server log notification
+    /// (FastMCP `ctx.info()` emits `notifications/message` on stdout) was
+    /// returned as the tool response and every later call was off-by-one.
+    ///
+    /// The whole exchange holds `ioLock` (#218): concurrent tool calls in
+    /// `--serve` mode would otherwise interleave stdin writes and race for
+    /// each other's stdout lines - id correlation alone drops the other
+    /// request's response instead of leaving it for its owner.
     private func sendAndReceive(
         _ message: String,
+        id: Int,
         timeoutMilliseconds: Int,
         operationDescription: String
     ) throws -> String {
-        send(message)
-        return try lineReader.readLine(
-            timeoutMilliseconds: timeoutMilliseconds,
-            operationDescription: operationDescription
-        )
+        ioLock.lock()
+        defer { ioLock.unlock() }
+        try send(message)
+        let deadline = Date().timeIntervalSinceReferenceDate + Double(timeoutMilliseconds) / 1000.0
+        while true {
+            let remainingMilliseconds = Int((deadline - Date().timeIntervalSinceReferenceDate) * 1000.0)
+            guard remainingMilliseconds > 0 else {
+                throw MCPError.timedOut("\(operationDescription.capitalized) timed out after \(timeoutMilliseconds / 1000)s")
+            }
+            let line = try lineReader.readLine(
+                timeoutMilliseconds: remainingMilliseconds,
+                operationDescription: operationDescription
+            )
+            switch MCPProtocol.classifyIncoming(line, awaitingId: id) {
+            case .matchingResponse:
+                return line
+            case .pingRequest(let reply):
+                try send(reply)
+            case .unrelated:
+                continue
+            }
+        }
     }
 }
 
@@ -194,22 +289,26 @@ actor RemoteMCPConnection: Sendable {
         }
     }
 
-    func callTool(name: String, arguments: String) async throws -> String {
+    func callTool(name: String, arguments: String) async throws -> MCPProtocol.ToolCallResult {
+        // Malformed model-emitted arguments must fail loudly instead of being
+        // silently replaced with {} by the request formatter (#241).
+        try MCPProtocol.validateToolArguments(name: name, arguments: arguments)
         let resp = try await post(MCPProtocol.toolsCallRequest(id: allocId(), name: name, arguments: arguments))
-        let result = try MCPProtocol.parseToolCallResponse(resp)
-        if result.isError {
-            throw MCPError.serverError("Tool '\(name)' failed: \(result.text)")
-        }
-        return result.text
+        // isError is a tool-execution error, returned (not thrown) so the model
+        // can see it and recover; only transport/protocol failures throw (#220).
+        return try MCPProtocol.parseToolCallResponse(resp)
     }
 
-    func shutdown() {
+    func shutdown() async {
         guard let sid = sessionId else { return }
         var req = URLRequest(url: url, timeoutInterval: 5)
         req.httpMethod = "DELETE"
         if let token = bearerToken { req.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization") }
         req.setValue(sid, forHTTPHeaderField: "Mcp-Session-Id")
-        session.dataTask(with: req).resume()
+        // Await the DELETE (bounded by the 5s timeoutInterval) so the session is
+        // actually released before the process exits, instead of firing a
+        // detached task that the exiting process never schedules (#246).
+        _ = try? await session.data(for: req)
     }
 
     private func allocId() -> Int {
@@ -282,7 +381,7 @@ enum AnyMCPConnection: Sendable {
         }
     }
 
-    func callTool(name: String, arguments: String) async throws -> String {
+    func callTool(name: String, arguments: String) async throws -> MCPProtocol.ToolCallResult {
         switch self {
         case .local(let c):
             // Run blocking stdio I/O off the cooperative thread pool
@@ -295,8 +394,18 @@ enum AnyMCPConnection: Sendable {
     func shutdown() {
         switch self {
         case .local(let c): c.shutdown()
-        // Best-effort: fire-and-forget (session will expire on the server)
+        // Best-effort: fire-and-forget (session will expire on the server).
+        // Used on the deregister-on-timeout path (#216) where we cannot await.
         case .remote(let c): Task { await c.shutdown() }
+        }
+    }
+
+    /// Awaited shutdown for the process-exit path: reap local children and await
+    /// the remote DELETE so cleanup completes before exit (#246).
+    func shutdownAndWait() async {
+        switch self {
+        case .local(let c): c.shutdown()
+        case .remote(let c): await c.shutdown()
         }
     }
 }
@@ -321,32 +430,76 @@ actor MCPManager {
                 conn = .local(local)
             }
             connections.append(conn)
-            for tool in conn.tools {
+            // First registration wins: a tool name already owned by an earlier
+            // server is NOT rebound here, so routing stays predictable and the
+            // shadowed variant is unreachable (warned below) (#239).
+            for tool in conn.tools where toolMap[tool.function.name] == nil {
                 toolMap[tool.function.name] = conn
             }
             if !quietMode {
                 if case .remote = conn {
                     printStderr("warning: remote MCP server attached (\(conn.identifier)) - tool arguments will be sent to this server")
                 }
-                printStderr("\(styled("mcp:", .cyan)) \(conn.identifier) - \(conn.tools.map(\.function.name).joined(separator: ", "))")
+                printStderr("\(styledErr("mcp:", .cyan)) \(conn.identifier) - \(conn.tools.map(\.function.name).joined(separator: ", "))")
+            }
+        }
+
+        // Loudly warn about tool-name collisions across servers. The shadowed
+        // duplicate is unreachable and would otherwise silently waste context
+        // tokens (both identical schemas were injected into the prompt) (#239).
+        if !quietMode {
+            let collisions = MCPToolRegistry.collisions(
+                servers: connections.map { (id: $0.identifier, toolNames: $0.tools.map(\.function.name)) }
+            )
+            for collision in collisions {
+                printStderr(
+                    "\(styledErr("warning:", .yellow)) tool name '\(collision.toolName)' is exposed by both \(collision.keptServer) and \(collision.ignoredServer); using \(collision.keptServer), ignoring the one from \(collision.ignoredServer)"
+                )
             }
         }
     }
 
     func allTools() -> [OpenAITool] {
-        connections.flatMap(\.tools)
+        // Deduplicate by name (first registration wins) so a shadowed
+        // duplicate is not injected into the prompt twice (#239).
+        MCPToolRegistry.deduplicate(connections.flatMap(\.tools))
     }
 
-    func execute(name: String, arguments: String) async throws -> String {
+    func execute(name: String, arguments: String) async throws -> MCPProtocol.ToolCallResult {
         guard let conn = toolMap[name] else {
             throw MCPError.toolNotFound("No MCP server provides tool '\(name)'")
         }
-        return try await conn.callTool(name: name, arguments: arguments)
+        do {
+            return try await conn.callTool(name: name, arguments: arguments)
+        } catch {
+            // A timed-out connection is dead. Deregister it so its tools stop
+            // being offered via allTools() and later calls fail fast with
+            // toolNotFound instead of routing to the dead connection, and reap
+            // its child. Without this the tool stayed permanently registered but
+            // broken. (#216)
+            if case .timedOut = error as? MCPError {
+                deregister(conn)
+            }
+            throw error
+        }
     }
 
-    func shutdown() {
-        for conn in connections {
-            conn.shutdown()
+    /// Remove a dead connection from the routing tables and reap its child.
+    private func deregister(_ conn: AnyMCPConnection) {
+        let id = conn.identifier
+        connections.removeAll { $0.identifier == id }
+        let deadToolNames = toolMap.filter { $0.value.identifier == id }.map(\.key)
+        for name in deadToolNames {
+            toolMap.removeValue(forKey: name)
         }
+        conn.shutdown()
+    }
+
+    func shutdown() async {
+        for conn in connections {
+            await conn.shutdownAndWait()
+        }
+        connections.removeAll()
+        toolMap.removeAll()
     }
 }

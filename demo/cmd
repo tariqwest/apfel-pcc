@@ -7,7 +7,11 @@
 #         cmd -c "show disk usage sorted by size"   # copy to clipboard
 #
 # Shell function version (add to .zshrc):
+<<<<<<< HEAD
 #   cmd(){ local x c r a; while [[ $1 == -* ]]; do case $1 in -x)x=1;shift;; -c)c=1;shift;; *)break;; esac; done; r=$(apfel-plus -q -s 'Output only a shell command.' "$*" | sed '/^```/d;/^#/d;s/\x1b\[[0-9;]*[a-zA-Z]//g;s/^[[:space:]]*//;/^$/d' | head -1); [[ $r ]] || { echo "no command generated"; return 1; }; printf '\e[32m$\e[0m %s\n' "$r"; [[ $c ]] && printf %s "$r" | pbcopy && echo "(copied)"; [[ $x ]] && { printf 'Run? [y/N] '; read -r a; [[ $a == y ]] && eval "$r"; }; return 0; }
+=======
+#   cmd(){ local x c r a; while [[ $1 == -* ]]; do case $1 in -x)x=1;shift;; -c)c=1;shift;; *)break;; esac; done; r=$(apfel -q --code -s 'Output only a shell command.' "$*" | sed '/^#/d;s/^[[:space:]]*//;/^$/d' | head -1); [[ $r ]] || { echo "no command generated"; return 1; }; printf '\e[32m$\e[0m %s\n' "$r"; [[ $c ]] && printf %s "$r" | pbcopy && echo "(copied)"; [[ $x ]] && { printf 'Run? [y/N] '; read -r a; [[ $a == y ]] && eval "$r"; }; return 0; }
+>>>>>>> upstream/main
 #
 # Examples:
 #   cmd find all swift files larger than 1MB
@@ -66,7 +70,11 @@ fi
 
 SYSTEM="You are a shell command generator for macOS (zsh/bash). Output ONLY the command — no explanation, no markdown, no code fences, no comments. If multiple commands are needed, join them with && or |. Never output anything except the command itself."
 
+<<<<<<< HEAD
 result=$(apfel-plus -q -s "$SYSTEM" "$1")
+=======
+result=$(apfel -q --code -s "$SYSTEM" "$1")
+>>>>>>> upstream/main
 status=$?
 
 if [[ $status -ne 0 ]]; then
@@ -74,8 +82,8 @@ if [[ $status -ne 0 ]]; then
     exit $status
 fi
 
-# Strip markdown fences, ANSI escape sequences, and whitespace
-result=$(echo "$result" | sed '/^```/d' | sed 's/\x1b\[[0-9;]*[a-zA-Z]//g' | sed 's/^[[:space:]]*//' | sed '/^$/d')
+# --code already strips fences and prose; normalize whitespace only
+result=$(echo "$result" | sed 's/^[[:space:]]*//' | sed '/^$/d')
 
 if $COPY; then
     echo "$result" | pbcopy

@@ -40,7 +40,7 @@ Issues in Apple's FoundationModels framework itself should be reported to Apple:
 ## Security Design
 
 - Server binds to localhost only by default
-- Origin validation rejects non-localhost requests unless `--permissive` is set
+- Origin validation rejects cross-origin requests unless `--no-origin-check` (or `--footgun`) is set
 - Bearer token authentication available via `--token` or `APFEL_TOKEN`
-- `--permissive` and `--dangerous-allow-all-origins` require explicit opt-in
+- Origin- and guardrail-loosening flags (`--no-origin-check`, `--footgun`, `--permissive`) require explicit opt-in
 - No secrets stored on disk; tokens are passed via environment variables or flags

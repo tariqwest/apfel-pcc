@@ -2,7 +2,11 @@
 
 apfel-plus exposes Apple's on-device **Foundation Model** over a local OpenAI-compatible HTTP server. Any language that can `POST` JSON to `http://localhost:11434/v1/chat/completions` can use it - **100% on-device, zero API cost, no network required for inference**.
 
+<<<<<<< HEAD
 These guides show how, in the idioms each language actually uses. Every code block on every guide was run against a live `apfel-plus --serve` before publishing. The runnable scripts live in the [apfel-guides-lab](https://github.com/Arthur-Ficial/apfel-guides-lab) repo.
+=======
+These guides show how, in the idioms each language uses. Every code block was run against a live `apfel --serve` before publishing.
+>>>>>>> upstream/main
 
 ## Guides
 
@@ -38,7 +42,7 @@ If `/health` responds, you're ready. Pick your language and follow the guide.
 
 ## Honest limits (same for all languages)
 
-- **Context window:** 4096 tokens
+- **Context window:** 4096 tokens on macOS 26, 8192 on macOS 27 (read at runtime; `apfel --model-info` prints the live value)
 - **Embeddings:** not supported (returns HTTP 501 - see each guide's error-handling section)
 - **Vision / audio:** not supported
 - **JSON mode:** supported via `response_format: {type: "json_object"}` - occasionally wrapped in markdown fences, so the guides show a one-line fence-strip pattern

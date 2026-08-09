@@ -8,6 +8,7 @@ For **scripting language guides** (how to call apfel-plus from Python, Node.js, 
 
 ## opencode
 
+<<<<<<< HEAD
 [opencode](https://opencode.ai) is an open-source terminal AI coding assistant. You can wire it to apfel-plus's OpenAI-compatible server so all inference stays on-device at zero cost.
 
 **Config:** `~/.config/opencode/opencode.json`
@@ -71,6 +72,11 @@ apfel-plus --serve
 ---
 
 Huge thanks to [**@tvi** (Tomas Virgl)](https://github.com/tvi) for contributing this integration and for taking the time to provide a working config and a real screenshot. This is exactly the kind of community contribution that makes apfel-plus more useful.
+=======
+[opencode](https://opencode.ai) is an open-source terminal AI coding agent. Wire it to apfel's OpenAI-compatible server and every token stays on-device at zero cost. Re-verified end-to-end on opencode 1.17.16 + apfel 1.8.2.
+
+Full setup, the verified config, a real transcript, and every gotcha are on the dedicated page: [docs/integrations/opencode.md](integrations/opencode.md). The one you must not miss: opencode pastes your global `~/.claude/CLAUDE.md` into the system prompt, which overflows apfel's on-device context window (4096 tokens on macOS 26, 8192 on macOS 27) - fix it with `export OPENCODE_DISABLE_CLAUDE_CODE_PROMPT=1`.
+>>>>>>> upstream/main
 
 ---
 
@@ -103,7 +109,13 @@ Huge thanks to [**@tvi** (Tomas Virgl)](https://github.com/tvi) for contributing
 }
 ```
 
+<<<<<<< HEAD
 Start apfel-plus:
+=======
+`max_tokens: 4096` matches the macOS 26 on-device window; on macOS 27 the window is 8192 - `apfel --model-info` prints the live value.
+
+Start apfel:
+>>>>>>> upstream/main
 
 ```bash
 apfel-plus --serve
@@ -129,7 +141,11 @@ Why this setup works well:
 
 - `apfel-plus` stays in the small-context, low-latency review lane
 - Continue provides the Visual Studio Code integration
+<<<<<<< HEAD
 - a second model can handle larger edit/apply tasks without overloading `apfel-plus`'s 4096-token context window
+=======
+- a second model can handle larger edit/apply tasks without overloading `apfel`'s small on-device context window (4096 tokens on macOS 26, 8192 on macOS 27)
+>>>>>>> upstream/main
 
 ---
 

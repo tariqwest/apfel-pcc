@@ -75,6 +75,8 @@ public enum ChatRequestValidationFailure: Sendable, Equatable, Hashable, CustomS
     case unsupportedParameter(UnsupportedChatParameter)
     /// The final message role was not `user` or `tool`.
     case invalidLastRole
+    /// The final non-tool message had empty or null content.
+    case emptyLastMessageContent
     /// The request included image content.
     case imageContent
     /// A numeric or string parameter had an invalid value.
@@ -91,6 +93,8 @@ public enum ChatRequestValidationFailure: Sendable, Equatable, Hashable, CustomS
             return parameter.message
         case .invalidLastRole:
             return "Last message must have role 'user' or 'tool'"
+        case .emptyLastMessageContent:
+            return "The last message must have non-empty 'content'"
         case .imageContent:
             return "Image content is not supported by the Apple on-device model"
         case .invalidParameterValue(let detail):
@@ -109,12 +113,45 @@ public enum ChatRequestValidationFailure: Sendable, Equatable, Hashable, CustomS
             return "validation failed: unsupported parameter \(parameter.name)"
         case .invalidLastRole:
             return "validation failed: last role != user/tool"
+        case .emptyLastMessageContent:
+            return "validation failed: empty last message content"
         case .imageContent:
             return "rejected: image content"
         case .invalidParameterValue(let detail):
             return "validation failed: \(detail)"
         case .invalidModel(let model):
             return "validation failed: unknown model \(model)"
+        }
+    }
+
+    /// The HTTP status code this failure maps to. An unknown model is a 404
+    /// (OpenAI parity: `model_not_found`); every other failure is a 400.
+    public var httpStatusCode: Int {
+        switch self {
+        case .invalidModel:
+            return 404
+        default:
+            return 400
+        }
+    }
+
+    /// The OpenAI `error.code` string for this failure, or `nil` when absent.
+    public var errorCode: String? {
+        switch self {
+        case .invalidModel:
+            return "model_not_found"
+        default:
+            return nil
+        }
+    }
+
+    /// The OpenAI `error.param` string for this failure, or `nil` when absent.
+    public var errorParam: String? {
+        switch self {
+        case .invalidModel:
+            return "model"
+        default:
+            return nil
         }
     }
 
@@ -168,17 +205,44 @@ public enum ChatRequestValidator {
             return .imageContent
         }
 
+        // A non-tool final message (last role is guaranteed user/tool here) must
+        // carry non-empty text. Empty or null content is a client-input error,
+        // not a server fault: without this check it surfaces downstream as a 500
+        // ("Last message has no text content") instead of a 400 (#233).
+        if let last = request.messages.last, last.role != "tool" {
+            let text = last.textContent
+            if text == nil || text?.isEmpty == true {
+                return .emptyLastMessageContent
+            }
+        }
+
         if let maxTokens = request.max_tokens, maxTokens <= 0 {
             return .invalidParameterValue("'max_tokens' must be a positive integer, got \(maxTokens)")
         }
         if let temp = request.temperature, temp < 0 {
             return .invalidParameterValue("'temperature' must be non-negative, got \(temp)")
         }
+        if let temp = request.temperature, temp > 2 {
+            return .invalidParameterValue("'temperature' must be between 0 and 2, got \(temp)")
+        }
+        if let topP = request.top_p, topP < 0 || topP > 1 {
+            return .invalidParameterValue("'top_p' must be between 0 and 1, got \(topP)")
+        }
+        if let seed = request.seed, seed < 0 {
+            return .invalidParameterValue("'seed' must be a non-negative integer, got \(seed)")
+        }
+        if let strategy = request.x_context_strategy, ContextStrategy(rawValue: strategy) == nil {
+            let valid = ContextStrategy.allCases.map(\.rawValue).joined(separator: ", ")
+            return .invalidParameterValue("'x_context_strategy' must be one of: \(valid). Got '\(strategy)'.")
+        }
         if let turns = request.x_context_max_turns, turns <= 0 {
             return .invalidParameterValue("'x_context_max_turns' must be a positive integer, got \(turns)")
         }
         if let reserve = request.x_context_output_reserve, reserve <= 0 {
             return .invalidParameterValue("'x_context_output_reserve' must be a positive integer, got \(reserve)")
+        }
+        if case .invalid(let raw) = request.tool_choice {
+            return .invalidParameterValue("Invalid 'tool_choice' value: \(raw). Must be 'auto', 'none', 'required', or a {\"type\":\"function\",\"function\":{\"name\":\"...\"}} object.")
         }
 
         return nil

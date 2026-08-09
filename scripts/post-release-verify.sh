@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Post-release verification for apfel.
-# Run after the Publish Release workflow completes.
+# Run after `make release` (scripts/publish-release.sh) completes.
 # Usage: ./scripts/post-release-verify.sh [expected-version]
 set -euo pipefail
 
@@ -56,6 +56,56 @@ if command -v apfel >/dev/null 2>&1; then
 else
     echo "apfel not in PATH (install with: brew install apfel-plus)"
 fi
+
+# --- 4b. Checksum + signature integrity (#226) ---
+step "Checksum + Developer ID signature"
+tarball="apfel-$version-arm64-macos.tar.gz"
+work=$(mktemp -d)
+if gh release download "v$version" --repo Arthur-Ficial/apfel \
+        --pattern "$tarball" --pattern "$tarball.sha256" --dir "$work" 2>/dev/null; then
+    # (a) tarball digest must match the published .sha256 asset
+    if [ -f "$work/$tarball.sha256" ]; then
+        published=$(awk '{print $1}' "$work/$tarball.sha256")
+        actual=$(shasum -a 256 "$work/$tarball" | awk '{print $1}')
+        if [ "$published" = "$actual" ]; then
+            pass "tarball digest matches published .sha256 asset"
+        else
+            fail "tarball digest ($actual) != published .sha256 ($published)"
+        fi
+    else
+        fail ".sha256 checksum asset missing from release"
+    fi
+
+    # (b) tarball digest must match the Homebrew tap formula sha256
+    formula=$(curl -fsSL "https://raw.githubusercontent.com/Arthur-Ficial/homebrew-tap/main/Formula/apfel.rb" 2>/dev/null || true)
+    tap_sha=$(printf '%s\n' "$formula" | grep -oE 'sha256 "[0-9a-f]{64}"' | head -1 | grep -oE '[0-9a-f]{64}')
+    actual=$(shasum -a 256 "$work/$tarball" | awk '{print $1}')
+    if [ -n "$tap_sha" ]; then
+        if [ "$tap_sha" = "$actual" ]; then
+            pass "tarball digest matches Homebrew tap formula sha256"
+        else
+            fail "tarball digest ($actual) != tap formula sha256 ($tap_sha)"
+        fi
+    else
+        echo "(could not read tap formula sha256 - skipping tap comparison)"
+    fi
+
+    # (c) the shipped binary must carry the Developer ID TeamIdentifier
+    tar -C "$work" -xzf "$work/$tarball" apfel 2>/dev/null || true
+    if [ -f "$work/apfel" ]; then
+        sig=$(codesign -dvv "$work/apfel" 2>&1 || true)
+        if echo "$sig" | grep -q "TeamIdentifier=7D2YX5DQ6M"; then
+            pass "binary is Developer ID signed (TeamIdentifier=7D2YX5DQ6M)"
+        else
+            fail "binary is not Developer ID signed (TeamIdentifier 7D2YX5DQ6M not found)"
+        fi
+    else
+        fail "could not extract apfel binary from tarball"
+    fi
+else
+    fail "could not download release assets for v$version"
+fi
+rm -rf "$work"
 
 # --- 5. Homebrew (informational) ---
 step "Homebrew (informational)"

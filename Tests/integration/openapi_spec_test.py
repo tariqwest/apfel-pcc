@@ -268,6 +268,7 @@ def test_server_running():
 # Tests — Non-streaming chat completion
 # ============================================================================
 
+@pytest.mark.model
 def test_chat_completion_schema():
     """Non-streaming response matches OpenAI ChatCompletion schema."""
     status, data = chat([{"role": "user", "content": "Say hi."}])
@@ -275,18 +276,21 @@ def test_chat_completion_schema():
     validate(instance=data, schema=CHAT_COMPLETION_SCHEMA)
 
 
+@pytest.mark.model
 def test_chat_completion_id_format():
     """Response id starts with 'chatcmpl-'."""
     _, data = chat([{"role": "user", "content": "Say ok."}])
     assert data["id"].startswith("chatcmpl-")
 
 
+@pytest.mark.model
 def test_chat_completion_object_field():
     """object field is exactly 'chat.completion'."""
     _, data = chat([{"role": "user", "content": "Say yes."}])
     assert data["object"] == "chat.completion"
 
 
+@pytest.mark.model
 def test_chat_completion_usage_sums():
     """total_tokens == prompt_tokens + completion_tokens."""
     _, data = chat([{"role": "user", "content": "Count to 3."}])
@@ -294,6 +298,7 @@ def test_chat_completion_usage_sums():
     assert u["total_tokens"] == u["prompt_tokens"] + u["completion_tokens"]
 
 
+@pytest.mark.model
 def test_chat_completion_finish_reason_stop():
     """Normal completion finishes with 'stop'."""
     _, data = chat([{"role": "user", "content": "Say hello."}])
@@ -304,6 +309,7 @@ def test_chat_completion_finish_reason_stop():
 # Tests — Streaming chat completion
 # ============================================================================
 
+@pytest.mark.model
 def test_streaming_chunks_schema():
     """Every streaming chunk matches the ChatCompletionChunk schema."""
     chunks = chat_stream([{"role": "user", "content": "Say hi."}])
@@ -312,6 +318,7 @@ def test_streaming_chunks_schema():
         validate(instance=chunk, schema=CHAT_COMPLETION_CHUNK_SCHEMA)
 
 
+@pytest.mark.model
 def test_streaming_first_chunk_has_role():
     """First chunk's delta should contain the role."""
     chunks = chat_stream([{"role": "user", "content": "Hello."}])
@@ -319,6 +326,7 @@ def test_streaming_first_chunk_has_role():
     assert first_with_choices["choices"][0]["delta"].get("role") == "assistant"
 
 
+@pytest.mark.model
 def test_streaming_last_chunk_finish_reason():
     """Last chunk with choices should have finish_reason='stop'."""
     chunks = chat_stream([{"role": "user", "content": "Reply with the single word OK."}])
@@ -330,6 +338,7 @@ def test_streaming_last_chunk_finish_reason():
     assert terminal_chunks[-1]["choices"][0]["finish_reason"] == "stop"
 
 
+@pytest.mark.model
 def test_streaming_object_field():
     """Streaming chunks with choices have object='chat.completion.chunk'."""
     chunks = chat_stream([{"role": "user", "content": "Ok."}])
@@ -338,6 +347,7 @@ def test_streaming_object_field():
             assert chunk["object"] == "chat.completion.chunk"
 
 
+@pytest.mark.model
 def test_streaming_usage_chunk_keeps_openai_chunk_envelope():
     """Final usage chunk (opt-in via stream_options.include_usage) must still
     include standard chunk metadata for strict clients. Per #100, the chunk is
@@ -358,6 +368,7 @@ def test_streaming_usage_chunk_keeps_openai_chunk_envelope():
     assert usage["total_tokens"] == usage["prompt_tokens"] + usage["completion_tokens"]
 
 
+@pytest.mark.model
 def test_streaming_omits_usage_chunk_without_opt_in():
     """Per OpenAI spec, the empty-choices usage chunk must only be emitted when
     stream_options.include_usage=true. See #100."""
@@ -370,6 +381,7 @@ def test_streaming_omits_usage_chunk_without_opt_in():
         f"usage field present on stream chunk without opt-in: {usage_chunks!r}"
 
 
+@pytest.mark.model
 def test_streaming_tool_call_chunks_include_indexed_deltas():
     """Streaming tool-call deltas must include per-call indexes for strict clients."""
     tools = [{
@@ -399,13 +411,23 @@ def test_streaming_tool_call_chunks_include_indexed_deltas():
         validate(instance=chunk, schema=CHAT_COMPLETION_CHUNK_SCHEMA)
         for call in chunk["choices"][0]["delta"]["tool_calls"]:
             assert isinstance(call["index"], int)
-    assert tool_call_chunks[-1]["choices"][0]["finish_reason"] == "tool_calls"
+        # OpenAI parity (#224): tool_calls deltas never carry finish_reason.
+        assert chunk["choices"][0].get("finish_reason") is None
+    # finish_reason arrives in a separate trailing chunk with an empty delta.
+    finish_chunks = [
+        chunk for chunk in chunks
+        if chunk.get("choices") and chunk["choices"][0].get("finish_reason") == "tool_calls"
+    ]
+    assert finish_chunks, "Expected a separate chunk carrying finish_reason tool_calls"
+    finish_delta = finish_chunks[-1]["choices"][0].get("delta", {})
+    assert not finish_delta.get("content") and not finish_delta.get("tool_calls")
 
 
 # ============================================================================
 # Tests — Tool calling schema
 # ============================================================================
 
+@pytest.mark.model
 def test_tool_call_response_schema():
     """Tool call response matches schema with finish_reason='tool_calls'."""
     tools = [{
@@ -515,6 +537,7 @@ def test_error_unsupported_frequency_penalty_schema():
     assert_invalid_request(status, data, "'frequency_penalty'")
 
 
+@pytest.mark.model
 def test_n_one_is_accepted():
     """n=1 is accepted as the only supported value."""
     status, data = chat([{"role": "user", "content": "Say hi."}], n=1)
@@ -522,6 +545,7 @@ def test_n_one_is_accepted():
     validate(instance=data, schema=CHAT_COMPLETION_SCHEMA)
 
 
+@pytest.mark.model
 def test_logprobs_false_is_accepted():
     """logprobs=false is accepted as a no-op."""
     status, data = chat([{"role": "user", "content": "Say hi."}], logprobs=False)
@@ -558,6 +582,66 @@ def test_health_schema():
     resp = httpx.get(f"{BASE_URL}/health", timeout=10)
     assert resp.status_code == 200
     validate(instance=resp.json(), schema=HEALTH_SCHEMA)
+
+
+def test_health_context_window_positive():
+    """/health context_window must never be 0 (#192).
+
+    On macOS 27 the SDK returns contextSize 0 during cold start; the
+    high-water-mark floor in TokenCounter prevents this from leaking
+    to clients. Model-free: the 4096 floor applies regardless of model
+    availability.
+    """
+    resp = httpx.get(f"{BASE_URL}/health", timeout=10)
+    assert resp.status_code == 200
+    data = resp.json()
+    assert data["context_window"] > 0, (
+        f"context_window is {data['context_window']}; expected > 0 (#192)"
+    )
+
+
+def test_models_context_window_positive():
+    """/v1/models context_window must never be 0 (#192).
+
+    Same root cause as the /health regression: startup-cached
+    contextSize locked in 0 on macOS 27. The per-request read with
+    high-water-mark floor prevents this.
+    """
+    resp = httpx.get(f"{BASE_URL}/v1/models", timeout=10)
+    assert resp.status_code == 200
+    data = resp.json()
+    assert len(data["data"]) > 0
+    model_entry = data["data"][0]
+    assert model_entry.get("context_window", 0) > 0, (
+        f"context_window is {model_entry.get('context_window')}; expected > 0 (#192)"
+    )
+
+
+def test_completion_not_context_length_exceeded():
+    """A minimal completion must never fail with context_length_exceeded (#192).
+
+    Guards the generation path directly. On macOS 27 cold start,
+    contextSize 0 made inputBudget() return -512, rejecting every
+    request before generation could begin. The 4096 floor in
+    TokenCounter.contextSize breaks this deadlock. Model-free: the
+    budget check runs before generation, so an unavailable model
+    produces a different error (server_error/503), never
+    context_length_exceeded.
+    """
+    payload = {
+        "model": MODEL,
+        "messages": [{"role": "user", "content": "Hi"}],
+    }
+    resp = httpx.post(
+        f"{BASE_URL}/v1/chat/completions", json=payload, timeout=30
+    )
+    if resp.status_code != 200:
+        body = resp.json()
+        error_type = body.get("error", {}).get("type", "")
+        assert error_type != "context_length_exceeded", (
+            "Minimal completion rejected with context_length_exceeded; "
+            "inputBudget is likely negative (#192)"
+        )
 
 
 # ============================================================================

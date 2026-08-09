@@ -33,6 +33,8 @@ Add this to your VSCode settings (`customendpoint` BYOK provider, chat-completio
 ]
 ```
 
+The `4096` token limits match the macOS 26 on-device window; on macOS 27 the window is 8192 - `apfel --model-info` prints the live value.
+
 Select **Apple Foundation Model** in the Copilot Chat model picker. Chat requests are served on-device.
 
 ## Diagnosing problems

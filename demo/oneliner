@@ -54,7 +54,11 @@ fi
 
 SYSTEM="You generate UNIX one-liners for macOS (zsh/bash). Output ONLY the command — no explanation, no markdown, no code fences. Prefer awk, sed, grep, sort, uniq, cut, tr, xargs, find, and jq. Use pipes. Keep it to a single line. Never output anything except the command."
 
+<<<<<<< HEAD
 result=$(apfel-plus -q -s "$SYSTEM" "$1")
+=======
+result=$(apfel -q --code -s "$SYSTEM" "$1")
+>>>>>>> upstream/main
 status=$?
 
 if [[ $status -ne 0 ]]; then
@@ -62,9 +66,8 @@ if [[ $status -ne 0 ]]; then
     exit $status
 fi
 
-# Strip any accidental markdown fences the model might add
-# Strip markdown fences, ANSI escape sequences, and whitespace
-result=$(echo "$result" | sed '/^```/d' | sed 's/\x1b\[[0-9;]*[a-zA-Z]//g' | sed 's/^[[:space:]]*//' | sed '/^$/d')
+# --code already strips fences and prose; normalize whitespace only
+result=$(echo "$result" | sed 's/^[[:space:]]*//' | sed '/^$/d')
 
 if $COPY; then
     echo "$result" | pbcopy

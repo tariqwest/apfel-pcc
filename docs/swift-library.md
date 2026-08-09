@@ -53,7 +53,7 @@ See [Examples/](../Examples/) for runnable samples covering OpenAI types, tool c
 
 | Area | Representative types |
 |------|---------------------|
-| OpenAI types | `ChatCompletionRequest`, `ChatCompletionResponse`, `OpenAIMessage`, `MessageContent`, `ToolDefinition`, `ResponseFormat` |
+| OpenAI types | `ChatCompletionRequest`, `OpenAIMessage`, `MessageContent`, `OpenAITool`, `ToolChoice`, `ResponseFormat` |
 | Validation | Request validators for unsupported features (embeddings, logprobs, n>1) |
 | Context strategies | `ContextStrategy` with 5 trimming policies |
 | Tool calling | `ToolCallHandler`, JSON tool-call detection, schema conversion |

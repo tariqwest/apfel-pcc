@@ -86,6 +86,122 @@ public enum ToolCallHandler {
                 return calls
             }
         }
+        // Last resort (#358): the text is clearly a tool-call attempt (the
+        // quoted {"tool_calls" marker is present) but no candidate parsed -
+        // typically unescaped quotes inside argument strings, which neither
+        // JSONSerialization nor bracket repair can survive. Salvage the
+        // function name so the call site routes the failure through the
+        // invalid-arguments recovery path (#241) instead of leaking the raw
+        // protocol JSON to the user as message content.
+        return salvageUnparseableToolCall(from: response)
+    }
+
+    /// Remove a `{"tool_calls": ...}` JSON block from model output so it never
+    /// leaks to the user as raw protocol text. The balanced-brace scan is
+    /// string-aware; when the block never balances (unescaped quotes desync
+    /// the scan, #358) everything from the marker to the end is stripped -
+    /// a truncated answer beats leaked protocol JSON. Text without the marker
+    /// is returned trimmed and otherwise unchanged.
+    public static func stripToolCallJSON(from text: String) -> String {
+        guard let range = text.range(of: "{\"tool_calls\"") else {
+            return text.trimmingCharacters(in: .whitespacesAndNewlines)
+        }
+        var depth = 0
+        var inString = false
+        var escaped = false
+        var idx = range.lowerBound
+        while idx < text.endIndex {
+            let ch = text[idx]
+            if inString {
+                if escaped { escaped = false }
+                else if ch == "\\" { escaped = true }
+                else if ch == "\"" { inString = false }
+            } else if ch == "\"" {
+                inString = true
+            } else if ch == "{" {
+                depth += 1
+            } else if ch == "}" {
+                depth -= 1
+                if depth == 0 {
+                    let before = String(text[text.startIndex..<range.lowerBound])
+                    let after = String(text[text.index(after: idx)...])
+                    return (before + after).trimmingCharacters(in: .whitespacesAndNewlines)
+                }
+            }
+            idx = text.index(after: idx)
+        }
+        // No balanced block: strip from the marker to the end (#358).
+        return String(text[text.startIndex..<range.lowerBound])
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+    }
+
+    /// Extract what can be salvaged from a tool-call attempt whose JSON is
+    /// unparseable: the first function name after the marker, plus the raw
+    /// (still unparseable) arguments text so downstream validation fails into
+    /// the tool-error feedback path rather than executing with defaults.
+    ///
+    /// When the raw arguments text contains a balanced, valid-JSON `{ ... }`
+    /// object (#367), that object is recovered as the arguments string so the
+    /// tool call can actually execute. This handles the common case where the
+    /// model emits unescaped inner quotes around a perfectly valid argument
+    /// object. When no unambiguous object is extractable, the raw text is
+    /// kept so validation still fails loud (#241).
+    private static func salvageUnparseableToolCall(from text: String) -> [ParsedToolCall]? {
+        guard let start = text.range(of: "{\"tool_calls\"") else { return nil }
+        let tail = String(text[start.lowerBound...])
+        guard let regex = try? NSRegularExpression(pattern: #""name"\s*:\s*"([A-Za-z0-9_.\-]+)""#),
+              let match = regex.firstMatch(in: tail, range: NSRange(tail.startIndex..., in: tail)),
+              let nameRange = Range(match.range(at: 1), in: tail) else {
+            return nil
+        }
+        let name = String(tail[nameRange])
+        var rawArguments: String
+        if let argsMarker = tail.range(of: "\"arguments\"") {
+            rawArguments = String(tail[argsMarker.upperBound...])
+                .trimmingCharacters(in: CharacterSet(charactersIn: ": \t\n"))
+        } else {
+            rawArguments = tail
+        }
+        if let recovered = extractFirstBalancedObject(from: rawArguments) {
+            rawArguments = recovered
+        }
+        let id = "call_\(UUID().uuidString.prefix(8))"
+        return [ParsedToolCall(id: id, name: name, argumentsString: rawArguments)]
+    }
+
+    /// Scan `text` for the first balanced `{ ... }` substring that parses as
+    /// valid JSON. The brace counter is string-aware (same technique as
+    /// `extractCandidates`). Returns `nil` when no unambiguous, parseable
+    /// object is found - the caller keeps the raw text so #241 fires.
+    private static func extractFirstBalancedObject(from text: String) -> String? {
+        guard let firstBrace = text.firstIndex(of: "{") else { return nil }
+        var depth = 0
+        var inString = false
+        var escaped = false
+        var idx = firstBrace
+        while idx < text.endIndex {
+            let ch = text[idx]
+            if inString {
+                if escaped { escaped = false }
+                else if ch == "\\" { escaped = true }
+                else if ch == "\"" { inString = false }
+            } else if ch == "\"" {
+                inString = true
+            } else if ch == "{" {
+                depth += 1
+            } else if ch == "}" {
+                depth -= 1
+                if depth == 0 {
+                    let candidate = String(text[firstBrace...idx])
+                    if let data = candidate.data(using: .utf8),
+                       (try? JSONSerialization.jsonObject(with: data)) != nil {
+                        return candidate
+                    }
+                    return nil
+                }
+            }
+            idx = text.index(after: idx)
+        }
         return nil
     }
 
@@ -231,7 +347,11 @@ public enum ToolCallHandler {
 
         var result: [ParsedToolCall] = []
         for call in rawCalls {
-            guard let id = call["id"] as? String else { continue }
+            // The on-device model routinely omits (or blanks) the id. Synthesize
+            // one instead of dropping the call, which used to leak the raw
+            // {"tool_calls":...} JSON to the user as plain text (#244).
+            let providedId = (call["id"] as? String)?.trimmingCharacters(in: .whitespacesAndNewlines)
+            let id = (providedId?.isEmpty == false) ? providedId! : "call_\(UUID().uuidString.prefix(8))"
 
             let name: String
             let rawArguments: Any?

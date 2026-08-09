@@ -237,7 +237,11 @@ Lab script: [`06_example.php`](https://github.com/Arthur-Ficial/apfel-guides-lab
 
 ## Tested with
 
+<<<<<<< HEAD
 - apfel-plus v1.0.3 / macOS 26.3.1 Apple Silicon
+=======
+- apfel v1.0.3 / macOS 26.3.1 Apple Silicon (original capture; the CLI and HTTP surfaces used here are release-gated by apfel's test suite on every version)
+>>>>>>> upstream/main
 - PHP 8.5.5 / openai-php/client 0.10.3 / Guzzle
 - Date: 2026-04-16
 

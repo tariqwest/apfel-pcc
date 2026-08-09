@@ -5,11 +5,19 @@
 > (FoundationModels OS 27 updates) and
 > [developer.apple.com/documentation/coreai](https://developer.apple.com/documentation/coreai/) (Core AI, beta).
 > Tracking epic: [#189](https://github.com/Arthur-Ficial/apfel/issues/189).
+> Updated 2026-07-22: OS 27 on-device context window confirmed as 8192 on real hardware (#192).
 
 ## TL;DR
 
+<<<<<<< HEAD
 WWDC 2026 surfaced two things. **The one that matters for apfel-plus is the FoundationModels OS 27
 update** - not the "Core AI" rename, which is a non-event for apfel-plus core.
+=======
+WWDC 2026 surfaced three things. **The one that matters most for apfel is new: Apple shipped a
+first-party `fm` CLI** (`fm respond`, `fm chat`, and `fm serve` - "a Chat Completions API server")
+that directly overlaps apfel's two core products. Second is the **FoundationModels OS 27 update**
+(new on-device model, bigger context, new APIs). The "Core AI" rename is a non-event for apfel core.
+>>>>>>> upstream/main
 
 **The real story: FoundationModels gets a substantial OS 27 update.** apfel-plus is built on
 FoundationModels (`LanguageModelSession`, `SystemLanguageModel`), and Apple's official updates page
@@ -20,9 +28,17 @@ confirms (not press speculation):
 - A new **`LanguageModel` protocol** plus open-source **`CoreAILanguageModel`/`MLXLanguageModel`** -
   an official bridge to drive any model through the FoundationModels session API. This makes a
   bring-your-own-model path tractable (#195).
+<<<<<<< HEAD
 - **`ToolCallingMode`** and **improved error types** - adoption candidates for apfel-plus (#197).
 - **On-device context window still reads 4096**; the bigger window is the cloud
   `PrivateCloudComputeLanguageModel`, which apfel-plus does not use - so apfel-plus's 4096 docs likely stand (#192).
+=======
+- **`ToolCallingMode`** and **improved error types** - adoption candidates for apfel (#197).
+- **On-device context window DOUBLED from 4096 to 8192 on OS 27 - CONFIRMED on real hardware**
+  (M3 Pro, macOS 27, via `apfel --model-info` and `apfel --count-tokens`). apfel already handles it
+  correctly because it reads `SystemLanguageModel.contextSize` at runtime. The hardcoded "4096" doc
+  references have been rewritten to describe the dynamic window (#192). See item #1 below.
+>>>>>>> upstream/main
 
 **The non-event: "Core AI" is just the Core ML successor.** It is a low-level tensor inference runtime
 (`AIModel`/`NDArray`/`InferenceFunction`), **not** a replacement for FoundationModels, with no chat,
@@ -30,6 +46,48 @@ prompts, tool calling, or server surface. apfel-plus needs **no Core AI code** a
 only matters as the runtime behind the new `CoreAILanguageModel` bridge above. The rest of this page
 explains exactly what Core AI is and is not, so the recurring "why doesn't apfel-plus use Core AI?" question
 is answered once.
+
+## The headline for apfel: Apple shipped `fm`
+
+> Researched 2026-06-09. Source: WWDC26 session
+> [What's new in the Foundation Models framework](https://developer.apple.com/videos/play/wwdc2026/241/)
+> and the public `fm --help` capture
+> ([gist](https://gist.github.com/robgough/7893602895e75801174750761988ffca)).
+
+macOS 27 ships a **first-party `fm` command-line tool**. Its surface is nearly one-to-one with apfel:
+
+| `fm` subcommand | apfel equivalent |
+|---|---|
+| `fm respond '...'` (+ `--stream`) | `apfel "prompt"` / `--stream` (core product #1) |
+| `fm serve` - *"Start a Chat Completions API server"* | `apfel --serve` (core product #2) |
+| `fm chat --instructions '...'` | `apfel --chat` (byproduct #3) |
+| `fm token-count '...'` | apfel `TokenCounter` |
+| `fm schema object --name Person --string name --int age` | apfel `SchemaConverter` |
+| `fm available` | apfel availability checks |
+| `fm quota-usage` | (no apfel equivalent - PCC quota) |
+
+Models: `system` (on-device, default) and `pcc` (Private Cloud Compute). Alongside `fm`, Apple shipped
+a **Python SDK** (`pip install apple-fm-sdk`, repo `apple/python-apple-fm-sdk`, macOS-only / Apple
+Silicon + Apple Intelligence), **open-sourced the core framework** ("runs wherever Swift runs,
+including Linux servers"), and a **framework utilities package** whose building blocks include
+"chat-completions interfacing (OpenAI-compatible)" - i.e. an official answer to apfel product #2.
+
+**This is the most consequential WWDC item for apfel and it is not Core AI.** Honest read:
+
+- apfel's three user-facing modes (CLI, OpenAI-compatible server, chat) now all have a first-party
+  equivalent. The Swift library (#4) is also undercut by the open-sourced framework + utilities
+  package + Python SDK.
+- Remaining apfel differentiators worth pressing: **available today on macOS 26** (`fm` needs
+  macOS 27, so there is an adoption-window lead); **OpenAI-compat depth and maturity** (honest 501s,
+  CORS, tool calling, `response_format`, real conformance tests vs. a brand-new `fm serve`);
+  **MCP client** (no MCP client surface visible in `fm`); **UNIX ergonomics** (`--json`, `NO_COLOR`,
+  exit codes, stdin detection); **cross-channel install** (brew/nix) and the apfel-family ecosystem.
+- **Open question for triage:** is `fm serve` genuinely OpenAI-conformant (the exact question asked
+  under Franz's HN post)? Worth running apfel's own `openapi_conformance` suite against `fm serve` on
+  OS 27 hardware to know precisely where apfel is ahead.
+
+Action: this needs a deliberate positioning decision (README + landing page) and a tracking issue.
+Not started here - flagged for Franz.
 
 ## What Core AI actually is
 
@@ -107,6 +165,7 @@ Core AI per se, but they ship in the same window and Core AI is the headline tha
 > [Foundation Models updates](https://developer.apple.com/documentation/updates/foundationmodels)
 > page (June 2026 / OS 27 entries), not just press reporting.** Details folded into the items below.
 
+<<<<<<< HEAD
 1. **FoundationModels context window - on-device window appears UNCHANGED at 4096.** apfel-plus's docs and
    behavior are built around a hard **4096-token** context (input + output combined). The figure
    appears across `README.md`, `docs/context-strategies.md`, `docs/integrations.md`,
@@ -116,6 +175,22 @@ Core AI per se, but they ship in the same window and Core AI is the headline tha
    `PrivateCloudComputeLanguageModel` (a **cloud** path apfel-plus deliberately does not use). So apfel-plus's
    on-device 4096 assumption most likely **holds** on OS 27. Still confirm the real number on OS 27
    hardware via `SystemLanguageModel.contextSize` (the API added in 26.4 that removes the hardcode).
+=======
+1. **FoundationModels context window - on-device window DOUBLED to 8192 on OS 27 (CONFIRMED).**
+   **Confirmed 2026-07-22 on real hardware (M3 Pro, macOS 27):** `apfel --model-info` reports
+   `context: 8192 tokens` and `apfel --count-tokens` budgets against the same value; the same
+   commands report 4096 on macOS 26. This matches the WWDC26 session-241
+   ([video](https://developer.apple.com/videos/play/wwdc2026/241/)) example, which prints
+   `let model = SystemLanguageModel(); print(model.contextSize) // 8192` for the **on-device** model.
+   So: **4096 tokens on macOS 26, 8192 on macOS 27.** The 32K figure is separate again - that is the
+   cloud `PrivateCloudComputeLanguageModel`, which apfel does not use.
+   - **Behavior was always safe:** apfel reads the live value via `SystemLanguageModel.contextSize`
+     (`Sources/TokenCounter.swift` -> `CLI.swift`, `Server.swift`, `Benchmark.swift`), not a
+     hardcode. No code change needed for the doubling.
+   - **Docs are fixed (#192):** the hardcoded "4096" references across `README.md` and `docs/` now
+     describe the dynamic window ("4096 tokens on macOS 26, 8192 on macOS 27") and point at
+     `apfel --model-info` for the live value.
+>>>>>>> upstream/main
 
 2. **FoundationModels base model change - CONFIRMED.** Apple's updates page states verbatim: *"the
    model changes when a person updates to iOS 27, iPadOS 27, macOS 27, and visionOS 27, test your
@@ -196,11 +271,18 @@ FoundationModels OS 27 updates (official, fetched 2026-06-09):
   to ... 27"), `LanguageModel` protocol, open-source `CoreAILanguageModel` / `MLXLanguageModel`,
   `GenerationOptions.ToolCallingMode`, improved error types, `DynamicProfile`, image analysis,
   `PrivateCloudComputeLanguageModel` (cloud, larger context).
+<<<<<<< HEAD
 - The on-device context window still reads **4,096 tokens** on this page; the larger context is the
   cloud `PrivateCloudComputeLanguageModel`, which apfel-plus does not use.
+=======
+- The on-device context window is **4,096 tokens on macOS 26** and **8,192 tokens on macOS 27** -
+  confirmed on real macOS 27 hardware via `apfel --model-info` and `apfel --count-tokens` (see
+  item #1 above). The 32K+ figure is separate again - that is the cloud
+  `PrivateCloudComputeLanguageModel`, which apfel does not use.
+>>>>>>> upstream/main
 
 Context / reporting: WWDC 2026 keynote coverage (2026-06-08) on the Core ML to Core AI rename, the
 FoundationModels coexistence story, and the Apple/Google Gemini base-model collaboration. The
-on-device base-model change and the new APIs above are confirmed by Apple's updates page; the exact
-on-device context window should still be read at runtime via `SystemLanguageModel.contextSize` on OS 27
-hardware rather than hardcoded.
+on-device base-model change and the new APIs above are confirmed by Apple's updates page; the
+on-device context window has since been confirmed on OS 27 hardware (8192 tokens) and is always read
+at runtime via `SystemLanguageModel.contextSize` rather than hardcoded.

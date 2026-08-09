@@ -103,6 +103,7 @@ This file was generated automatically by \`scripts/generate-examples.sh\`.
 11. [MCP Tool Calling](#11-mcp-tool-calling)
 12. [Edge Cases](#12-edge-cases)
 13. [Formatting & Structure](#13-formatting--structure)
+14. [File Extraction (PDF, image OCR + understanding)](#14-file-extraction-pdf-image-ocr--understanding)
 
 ---
 
@@ -161,6 +162,12 @@ run coding "Write a Python function that checks if a number is prime."
 run coding "Write a Swift function that reverses a string without using built-in reverse."
 run coding "What is the time complexity of binary search? Explain in one sentence."
 run coding "Find the bug: for i in range(10): if i = 5: print(i)"
+run_with_flags coding \
+    'apfel --code "Write a Python function that deduplicates a list, keeping order."' \
+    --code "Write a Python function that deduplicates a list, keeping order."
+run_with_flags coding \
+    'apfel --code "shell one-liner that shows the 5 largest files in the current directory"' \
+    --code "shell one-liner that shows the 5 largest files in the current directory"
 
 # ============================================================================
 echo "## 6. Math & Logic" >&2
@@ -281,6 +288,36 @@ run_with_flags format \
 run_with_flags format \
     'apfel --stream "Count from 1 to 5."' \
     --stream "Count from 1 to 5."
+
+# ============================================================================
+echo "## 14. File Extraction (PDF, image OCR + understanding)" >&2
+# ============================================================================
+echo "## 14. File Extraction (PDF, image OCR + understanding)"
+echo ""
+echo "All extraction runs 100% on-device via the shared [lesbar](https://github.com/Arthur-Ficial/lesbar) package (Vision OCR + PDFKit + image classification). Fixtures are public domain; see Tests/integration/fixtures/lesbar/README.md."
+echo ""
+
+LFX="Tests/integration/fixtures/lesbar"
+
+# A text-dense PDF can exceed the 4096-token window; --count-tokens previews the
+# extraction and the honest budget before you spend it.
+run_with_flags files \
+    'apfel -f irs_w9.pdf --count-tokens "Summarize this form."' \
+    -f "$LFX/irs_w9.pdf" --count-tokens "Summarize this form."
+
+run_with_flags files \
+    'apfel -f wikimedia_declaration.jpg "What historic document is this, and what year?"' \
+    -f "$LFX/wikimedia_declaration.jpg" "What historic document is this, and what year?"
+
+run_with_flags files \
+    'apfel -f wikimedia_mona_lisa.jpg "In a few words, what is in this image?"' \
+    -f "$LFX/wikimedia_mona_lisa.jpg" "In a few words, what is in this image?"
+
+# Debuggable: --debug shows exactly what apfel puts to the API, --count-tokens keeps
+# it model-free. Here, on-device OCR of a NASA public-domain photo of an engraved plaque.
+run_with_flags files \
+    'apfel -f apollo11_plaque.jpg --count-tokens --debug' \
+    -f "$LFX/apollo11_plaque.jpg" --count-tokens --debug
 
 } > "$OUT"
 

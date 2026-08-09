@@ -33,6 +33,14 @@ apfel follows semantic versioning:
 
 `ApfelCore` follows the same version numbers as apfel itself. There is no separate library version line.
 
+### Enum evolution
+
+Public `ApfelCore` enums are non-frozen: new cases may be added in MINOR releases (for example, a new validation-failure or error case). Do not switch over them exhaustively - always include a `default` branch. Removing or changing an existing case remains a MAJOR change. CI enforces exactly this split: the API-breakage gate fails on removals and signature changes but permits added enum cases.
+
+### Fix-supporting API in patch releases
+
+New public `ApfelCore` API whose sole purpose is to support a bug fix - for example, a pure type extracted so the fix's decision logic is unit-testable - MAY ship in a PATCH release; the fix motivates the version, not the surface. New API that adds user-facing capability (new features, flags, or endpoints) requires at least a MINOR release. Precedent: v1.7.1 shipped `TokenCountFallback` in support of the #315 fix. The CI API-breakage gate only flags removals and signature changes, so shipping additive API in a patch is a deliberate release decision, not an accident the gate would catch.
+
 ## Deprecation Policy
 
 - Public `ApfelCore` APIs deprecate before removal.
