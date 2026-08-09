@@ -8,7 +8,7 @@
 [![No Xcode Required](https://img.shields.io/badge/Xcode-not%20required-orange)](https://developer.apple.com/xcode/resources/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 [![100% On-Device](https://img.shields.io/badge/inference-100%25%20on--device-green)](https://developer.apple.com/documentation/foundationmodels)
-[![Website](https://img.shields.io/badge/web-apfel-pcc.franzai.com-16A34A)](https://apfel.franzai.com)
+[![Website](https://img.shields.io/badge/web-apfel.franzai.com-16A34A)](https://apfel.franzai.com)
 [![#agentswelcome](https://img.shields.io/badge/%23agentswelcome-PRs%20welcome-0066cc?style=for-the-badge&labelColor=0d1117&logo=probot&logoColor=white)](#contributing)
 
 Apple Silicon Macs ship a built-in LLM via [Apple FoundationModels](https://developer.apple.com/documentation/foundationmodels). `apfel-pcc` exposes it as a UNIX tool and a local OpenAI-compatible server. On-device by default — no API keys, no cloud, no third parties. On macOS 27+ you can opt into Apple's [Private Cloud Compute](https://security.apple.com/blog/private-cloud-compute/) (still no API keys, still routed through the same `FoundationModels` framework) for a 32K context window via `--pcc` or `model: "apple-foundationmodel-pcc"`.
