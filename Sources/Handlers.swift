@@ -256,13 +256,8 @@ func handleChatCompletion(_ request: Request, context: some RequestContext) asyn
         let result = streamingResponse(session: session, prompt: finalPrompt,
                                        id: requestId, created: created,
                                        genOpts: genOpts, promptTokens: promptTokens,
-<<<<<<< HEAD
-                                       includeUsage: includeUsage,
-                                       backend: backend,
-=======
                                        includeUsage: includeUsage, jsonMode: jsonMode,
                                        hasTools: !(chatRequest.tools?.isEmpty ?? true),
->>>>>>> upstream/main
                                        requestBody: requestBodyString, events: events)
         return (result.response, result.trace)
     } else {
@@ -528,12 +523,8 @@ private func streamingResponse(
     genOpts: GenerationOptions,
     promptTokens: Int,
     includeUsage: Bool,
-<<<<<<< HEAD
-    backend: ModelBackend,
-=======
     jsonMode: Bool,
     hasTools: Bool,
->>>>>>> upstream/main
     requestBody: String?,
     events: [String]
 ) -> (response: Response, trace: ChatRequestTrace) {
